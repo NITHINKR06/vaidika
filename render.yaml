@@ -23,10 +23,6 @@ services:
         sync: false
       - key: EMERGENCY_ALERT_NUMBER
         sync: false
-    disk:
-      name: vaidika-data
-      mountPath: /app/data
-      sizeGB: 1
 
   # Frontend Next.js Service
   - type: web

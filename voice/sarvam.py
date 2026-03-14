@@ -1,6 +1,6 @@
 # voice/sarvam.py — Sarvam AI voice pipeline
 
-import os
+import os, base64
 import requests
 from dotenv import load_dotenv
 
@@ -70,7 +70,12 @@ def text_to_speech(text: str, language: str = 'hi-IN') -> bytes:
     if not res.ok:
         print(f"❌ Sarvam TTS Error {res.status_code}: {res.text}")
         res.raise_for_status()
-    return res.content
+    # Sarvam returns {"audios": ["<base64 WAV>"], ...}
+    data = res.json()
+    audio_b64 = data.get('audios', [None])[0]
+    if not audio_b64:
+        raise ValueError('No audio returned from Sarvam TTS')
+    return base64.b64decode(audio_b64)
 
 
 def stt_and_translate_to_english(audio_bytes: bytes, source_language: str) -> dict:

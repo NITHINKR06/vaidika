@@ -2,6 +2,8 @@
 import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
+import SpeakButton from '@/components/SpeakButton'
+import { unlockAudio, playBase64 } from '@/lib/audioPlayer'
 import {
   getFullRecord, saveConsultation, patientSpeech,
   doctorSpeech, translateText, getDischargeMessage, speakB64,
@@ -18,10 +20,13 @@ const LANG_NAMES = {
   'ml-IN': 'Malayalam', 'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati', 'en-IN': 'English'
 }
 
-// Play base64 audio in browser
+// Play base64 audio in browser (using Blob URL for reliability)
+// Play base64 audio in browser (using persistent AudioPlayer for reliability)
 function playAudio(b64) {
-  const audio = new Audio(`data:audio/wav;base64,${b64}`)
-  audio.play().catch(() => { })
+  if (!b64) return;
+  playBase64(b64).catch(e => {
+    if (e.name !== 'AbortError') console.error('[Audio] Play failed:', e)
+  });
 }
 
 function Row({ label, value }) {
@@ -56,6 +61,8 @@ function VoiceTurn({ label, color, onResult, buttonText, processingText }) {
       }
       setProcessing(false)
     } else {
+      // Unlock audio engine on user-gesture
+      unlockAudio()
       start()
     }
   }
@@ -161,6 +168,7 @@ export default function DoctorDashboard() {
 
   // Get discharge message + play audio
   const handleDischarge = async () => {
+    unlockAudio(); // Unlock on gesture
     try {
       const msg = await getDischargeMessage(patientId)
       setDischarge(msg)
@@ -248,12 +256,27 @@ export default function DoctorDashboard() {
                       ${turn.role === 'doctor' ? 'bg-teal-50' : 'bg-blue-50'}`}>
                       <div className="font-medium text-slate-800">{turn.original}</div>
                       {turn.translated && turn.translated !== turn.original && (
-                        <div className="text-slate-400 text-xs mt-1 italic">{turn.translated}</div>
+                        <div className="text-slate-400 text-xs mt-1 italic flex items-center gap-1.5">
+                          {turn.translated}
+                          <SpeakButton
+                            text={turn.translated}
+                            language={turn.role === 'doctor' ? patLang : 'en-IN'}
+                          />
+                        </div>
                       )}
-                      {turn.audioB64 && (
-                        <button onClick={() => playAudio(turn.audioB64)}
-                          className="text-xs text-teal-600 mt-1 hover:underline">🔊 Replay</button>
-                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        {turn.audioB64 && (
+                          <button onClick={() => playAudio(turn.audioB64)}
+                            className="text-xs text-teal-600 hover:underline">🔊 Replay</button>
+                        )}
+                        {!turn.audioB64 && turn.original && (
+                          <SpeakButton
+                            text={turn.original}
+                            language={turn.role === 'patient' ? patLang : 'en-IN'}
+                            label="Speak"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -285,11 +308,20 @@ export default function DoctorDashboard() {
                 </span>
               </div>
             </div>
-            <Row label="Diagnosis" value={clinicalRecord.diagnosis} />
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <Row label="Diagnosis" value={clinicalRecord.diagnosis} />
+              {clinicalRecord.diagnosis && <SpeakButton text={clinicalRecord.diagnosis} language={patLang} label={`Speak in ${langName}`} size="md" />}
+            </div>
             <Row label="Symptoms" value={clinicalRecord.symptoms?.join(', ')} />
-            <Row label="Prescriptions" value={clinicalRecord.prescriptions?.join(' | ')} />
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <Row label="Prescriptions" value={clinicalRecord.prescriptions?.join(' | ')} />
+              {clinicalRecord.prescriptions?.length > 0 && <SpeakButton text={clinicalRecord.prescriptions.join(', ')} language={patLang} label={`Speak in ${langName}`} size="md" />}
+            </div>
             <Row label="Lab Tests" value={clinicalRecord.lab_tests?.join(', ')} />
-            <Row label="Follow-up" value={clinicalRecord.followup} />
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <Row label="Follow-up" value={clinicalRecord.followup} />
+              {clinicalRecord.followup && <SpeakButton text={clinicalRecord.followup} language={patLang} label={`Speak in ${langName}`} size="md" />}
+            </div>
             <Row label="Notes" value={clinicalRecord.clinical_notes} />
             <Row label="Routed to" value={clinicalRecord.route_to?.join(' + ')} />
 

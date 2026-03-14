@@ -2,7 +2,13 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
+import SpeakButton from '@/components/SpeakButton'
 import { getFullRecord, updateDepartment } from '@/lib/api'
+
+const LANG_NAMES = {
+  'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu', 'kn-IN': 'Kannada',
+  'ml-IN': 'Malayalam', 'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati', 'en-IN': 'English'
+}
 
 export default function PharmacyPortal() {
   const [record, setRecord] = useState(null)
@@ -35,6 +41,8 @@ export default function PharmacyPortal() {
   const meds = record?.consultation?.prescriptions || []
   const severity = record?.consultation?.severity
   const alreadyDone = record?.pharmacy_status?.status === 'dispensed'
+  const patLang = record?.patient?.language || 'hi-IN'
+  const langName = LANG_NAMES[patLang] || patLang
 
   return (
     <div className="min-h-screen bg-orange-50 p-6">
@@ -51,18 +59,20 @@ export default function PharmacyPortal() {
             <div>
               <div className="font-bold text-slate-800">{record.patient.name}</div>
               <div className="text-slate-500 text-sm">
-                Age {record.patient.age} · {record.patient.gender} · {record.patient.patient_id}
+                Age {record.patient.age} · {record.patient.gender} · {record.patient.patient_id} · Speaks <strong>{langName}</strong>
               </div>
               {record.consultation?.diagnosis && (
                 <div className="text-xs text-slate-400 mt-1">Dx: {record.consultation.diagnosis}</div>
               )}
             </div>
-            {severity && (
-              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
+            <div className="flex items-center gap-2">
+              {severity && (
+                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
                   severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
-                {severity}
-              </span>
-            )}
+                  {severity}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -74,14 +84,23 @@ export default function PharmacyPortal() {
 
         {meds.length > 0 && !done && !alreadyDone && (
           <>
-            <p className="text-sm text-slate-500 mb-3">Prescribed by doctor — verify and dispense:</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-slate-500">Prescribed by doctor — verify and dispense:</p>
+              <SpeakButton
+                text={`You have been prescribed the following medicines: ${meds.join(', ')}`}
+                language={patLang}
+                label={`Speak all in ${langName}`}
+                size="md"
+              />
+            </div>
             <div className="space-y-3 mb-5">
               {meds.map((med, i) => (
                 <div key={i} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 font-bold text-sm shrink-0">
                     {i + 1}
                   </div>
-                  <div className="font-semibold text-slate-800">{med}</div>
+                  <div className="font-semibold text-slate-800 flex-1">{med}</div>
+                  <SpeakButton text={med} language={patLang} />
                 </div>
               ))}
             </div>

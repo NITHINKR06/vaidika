@@ -2,7 +2,13 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
+import SpeakButton from '@/components/SpeakButton'
 import { getFullRecord, updateDepartment } from '@/lib/api'
+
+const LANG_NAMES = {
+  'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu', 'kn-IN': 'Kannada',
+  'ml-IN': 'Malayalam', 'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati', 'en-IN': 'English'
+}
 
 export default function LabPortal() {
   const [record, setRecord] = useState(null)
@@ -32,6 +38,8 @@ export default function LabPortal() {
   }
 
   const tests = record?.consultation?.lab_tests || []
+  const patLang = record?.patient?.language || 'hi-IN'
+  const langName = LANG_NAMES[patLang] || patLang
   const severity = record?.consultation?.severity
 
   return (
@@ -48,14 +56,16 @@ export default function LabPortal() {
           <div className="bg-white rounded-2xl border-l-4 border-cyan-500 p-4 mb-5 shadow-sm flex justify-between items-center">
             <div>
               <div className="font-bold text-slate-800">{record.patient.name}</div>
-              <div className="text-slate-500 text-sm">Age {record.patient.age} · {record.patient.patient_id}</div>
+              <div className="text-slate-500 text-sm">Age {record.patient.age} · {record.patient.patient_id} · Speaks <strong>{langName}</strong></div>
             </div>
-            {severity && (
-              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
+            <div className="flex items-center gap-2">
+              {severity && (
+                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
                   severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
-                {severity}
-              </span>
-            )}
+                  {severity}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -67,12 +77,21 @@ export default function LabPortal() {
 
         {tests.length > 0 && !done && record?.lab_status?.status !== 'completed' && (
           <div className="space-y-3 mb-5">
-            <p className="text-sm text-slate-500 mb-2">Tests ordered by doctor — fill all results:</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-slate-500">Tests ordered by doctor — fill all results:</p>
+              <SpeakButton
+                text={`You need to do the following tests: ${tests.join(', ')}`}
+                language={patLang}
+                label={`Speak all in ${langName}`}
+                size="md"
+              />
+            </div>
             {tests.map(test => (
               <div key={test} className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <span className="w-2 h-2 bg-cyan-400 rounded-full" />
                   {test}
+                  <SpeakButton text={test} language={patLang} />
                 </div>
                 <input placeholder={`Result for ${test}`} value={results[test] || ''}
                   onChange={e => setResults({ ...results, [test]: e.target.value })}

@@ -11,20 +11,24 @@ export default function QRScanner({ onScan, onClose }) {
   const hasScanned = useRef(false)
 
   useEffect(() => {
-    let scanner
+    let isCancelled = false
+    let scanner = null
+
     const init = async () => {
       try {
         const { Html5Qrcode } = await import('html5-qrcode')
+        if (isCancelled) return
+
         scanner = new Html5Qrcode('qr-reader')
         scannerRef.current = scanner
+
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
-            if (hasScanned.current) return
+            if (hasScanned.current || isCancelled) return
             hasScanned.current = true
 
-            // Try to parse JSON payload, fallback to raw string as patient_id
             try {
               const data = JSON.parse(decodedText)
               onScan(data.patient_id || decodedText)
@@ -32,17 +36,22 @@ export default function QRScanner({ onScan, onClose }) {
               onScan(decodedText)
             }
           },
-          () => { }   // ignore per-frame errors
+          () => { }
         )
       } catch (e) {
-        setError('Camera not available. Enter Patient ID manually.')
+        if (!isCancelled) {
+          setError('Camera not available. Enter Patient ID manually.')
+        }
       }
     }
+
     init()
+
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().then(() => {
-          scannerRef.current.clear()
+      isCancelled = true
+      if (scanner) {
+        scanner.stop().then(() => {
+          scanner.clear()
         }).catch(() => { })
       }
     }

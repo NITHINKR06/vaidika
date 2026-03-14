@@ -1,0 +1,45 @@
+services:
+  # Backend FastAPI Service
+  - type: web
+    name: vaidika-backend
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: docker/Dockerfile.backend
+    plan: free
+    region: singapore # Choose closest to you
+    envVars:
+      - key: DB_PATH
+        value: /app/data/vaidika.db
+      - key: GOOGLE_API_KEY
+        sync: false
+        placeholder: "Get from https://aistudio.google.com"
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: EMERGENCY_ALERT_NUMBER
+        sync: false
+    disk:
+      name: vaidika-data
+      mountPath: /app/data
+      sizeGB: 1
+
+  # Frontend Next.js Service
+  - type: web
+    name: vaidika-frontend
+    runtime: docker
+    dockerContext: vaidika-ui
+    dockerfilePath: Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: vaidika-backend
+          type: web
+          property: host
+    # Health checks can be added if needed, but Render handles basics

@@ -18,31 +18,42 @@
 
 ## Architecture
 
-```
-Patient speaks Hindi
-        ↓
-Browser mic → /voice/patient-speech → Sarvam STT → Hindi text
-        ↓
-Sarvam translate → English text shown to doctor
-        ↓
-Doctor speaks English
-        ↓
-Browser mic → /voice/doctor-speech → Sarvam STT → English text
-        ↓
-Sarvam translate → Hindi text + Sarvam TTS → audio played to patient
-        ↓
-Doctor clicks CONFIRM
-        ↓
-Full transcript → Qwen2.5:7b (Ollama, local) → ClinicalRecord JSON
-        ↓
-┌─────────────┬──────────────┬────────────────┐
-│  SQLite DB  │  Delta Lake  │  Airflow DAG   │
-│  (main)     │  (analytics) │  lab+pharmacy  │
-└─────────────┴──────────────┴────────────────┘
-        ↓                           ↓
-  Next.js portals          Twilio SMS (if emergency)
-        ↓                           ↓
-  PDF Generation           Analytics Dashboard
+```mermaid
+graph TD
+    subgraph "Frontend (Next.js)"
+        UI["User Portals (Reception, Doctor, Lab, Pharmacy, Analytics)"]
+        BrowserMic["Browser Microphone"]
+    end
+
+    subgraph "Backend (FastAPI)"
+        API["FastAPI Server"]
+        PDF["PDF Generation (FPDF2)"]
+        QR["QR Generation"]
+    end
+
+    subgraph "External Services"
+        Sarvam["Sarvam AI (STT, Translate, TTS)"]
+        Twilio["Twilio SMS API"]
+    end
+
+    subgraph "Local AI & Data"
+        Ollama["Ollama (Qwen 2.5:7b)"]
+        SQLite["SQLite DB (Main Storage)"]
+        Delta["Delta Lake (Analytics)"]
+        Airflow["Airflow (Pipelines)"]
+    end
+
+    UI <--> API
+    BrowserMic --> API
+    API <--> Sarvam
+    API <--> Ollama
+    API <--> SQLite
+    API --> Twilio
+    API --> PDF
+    API --> QR
+    API --> Airflow
+    Airflow --> Delta
+    Delta --> UI
 ```
 
 ---
@@ -153,7 +164,86 @@ npm run dev
 
 ---
 
-## Complete Patient Journey
+## Data Model (ERD)
+
+```mermaid
+erDiagram
+    PATIENTS ||--o{ CONSULTATIONS : "has"
+    PATIENTS ||--o{ DEPT_UPDATES : "receives"
+    PATIENTS ||--o{ LAB_ORDERS : "has"
+    PATIENTS ||--o{ PRESCRIPTIONS : "has"
+    PATIENTS ||--o{ EMERGENCY_ALERTS : "triggers"
+
+    PATIENTS {
+        string patient_id PK
+        string name
+        int age
+        string gender
+        string language
+        string aadhaar_last4
+        int token_number
+        int room_number
+        string qr_code
+        int checked_in
+        string created_at
+    }
+
+    CONSULTATIONS {
+        string consultation_id PK
+        string patient_id FK
+        string transcript
+        string symptoms
+        string diagnosis
+        string prescriptions
+        string lab_tests
+        string severity
+        string route_to
+        string followup
+        string clinical_notes
+        string created_at
+    }
+
+    DEPT_UPDATES {
+        string update_id PK
+        string patient_id FK
+        string dept
+        string action
+        string data
+        string updated_at
+    }
+
+    LAB_ORDERS {
+        string order_id PK
+        string patient_id FK
+        string tests
+        string status
+        string results
+        string created_at
+        string updated_at
+    }
+
+    PRESCRIPTIONS {
+        string rx_id PK
+        string patient_id FK
+        string medicines
+        string status
+        string created_at
+        string updated_at
+    }
+
+    EMERGENCY_ALERTS {
+        string alert_id PK
+        string patient_id FK
+        string severity
+        string diagnosis
+        int sms_sent
+        string created_at
+    }
+```
+
+---
+
+## Patient Journey
 
 ### 1. Reception → `/reception`
 - Staff enters patient name, age, gender, preferred language.

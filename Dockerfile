@@ -1,14 +1,23 @@
-# Stage 1: Build
+# Root-level Dockerfile for building the Frontend
+# This allows running 'docker build .' from the root directory to build the UI
+
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+
+# Copy package files from the sub-directory
+COPY vaidika-ui/package*.json ./
 RUN npm install
-COPY . .
+
+# Copy all frontend files
+COPY vaidika-ui/ .
+
+# Build the app
 RUN npm run build
 
 # Stage 2: Runtime
 FROM node:20-alpine AS runner
 WORKDIR /app
+
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public

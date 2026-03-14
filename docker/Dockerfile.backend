@@ -20,4 +20,4 @@ COPY . .
 ENV DB_PATH=/app/data/vaidika.db
 
 EXPOSE 8000
-CMD ["python", "api/main.py"]
+CMD ["python", "-m", "api.main"]

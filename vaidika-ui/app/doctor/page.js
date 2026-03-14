@@ -1,15 +1,34 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
 import SpeakButton from '@/components/SpeakButton'
 import { unlockAudio, playBase64 } from '@/lib/audioPlayer'
+import { useApp } from '@/lib/AppContext'
 import {
   getFullRecord, saveConsultation, patientSpeech,
   doctorSpeech, translateText, getDischargeMessage, speakB64,
   getClinicalPDF_URL
 } from '@/lib/api'
 import useRecorder from '@/lib/useRecorder'
+import {
+  Mic,
+  Stethoscope,
+  ClipboardList,
+  MessageSquare,
+  FileText,
+  Download,
+  User,
+  History,
+  AlertCircle,
+  Play,
+  CheckCircle2,
+  PhoneCall,
+  Loader2,
+  Pill,
+  Microscope
+} from 'lucide-react'
 
 const SEV = {
   low: 'sev-low', medium: 'sev-medium', high: 'sev-high', emergency: 'sev-emergency'
@@ -20,8 +39,6 @@ const LANG_NAMES = {
   'ml-IN': 'Malayalam', 'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati', 'en-IN': 'English'
 }
 
-// Play base64 audio in browser (using Blob URL for reliability)
-// Play base64 audio in browser (using persistent AudioPlayer for reliability)
 function playAudio(b64) {
   if (!b64) return;
   playBase64(b64).catch(e => {
@@ -29,18 +46,8 @@ function playAudio(b64) {
   });
 }
 
-function Row({ label, value }) {
-  if (!value) return null
-  return (
-    <div className="flex gap-3 py-2 border-b border-slate-100 last:border-0 text-sm">
-      <span className="text-slate-400 w-32 shrink-0">{label}</span>
-      <span className="text-slate-800 font-medium">{value}</span>
-    </div>
-  )
-}
-
 // ── Voice Turn Component ─────────────────────────────────────────
-function VoiceTurn({ label, color, onResult, buttonText, processingText }) {
+function VoiceTurn({ label, icon, onResult, buttonText, processingText }) {
   const { recording, start, stop } = useRecorder()
   const [processing, setProcessing] = useState(false)
   const [status, setStatus] = useState('')
@@ -53,7 +60,7 @@ function VoiceTurn({ label, color, onResult, buttonText, processingText }) {
       setStatus('Processing speech...')
       try {
         await onResult(blob)
-        setStatus('Done ✓')
+        setStatus('Analysis complete')
         setTimeout(() => setStatus(''), 2000)
       } catch (e) {
         setStatus(`Error: ${e.message}`)
@@ -61,41 +68,54 @@ function VoiceTurn({ label, color, onResult, buttonText, processingText }) {
       }
       setProcessing(false)
     } else {
-      // Unlock audio engine on user-gesture
       unlockAudio()
       start()
     }
   }
 
   return (
-    <div className={`rounded-2xl p-4 border ${color}`}>
-      <div className="flex items-center justify-between">
-        <span className="font-semibold text-sm">{label}</span>
+    <div className="medical-card group border-white/5 hover:border-medical-500/30 transition-all p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-slate-800/80 flex items-center justify-center text-medical-400 border border-white/5">
+            {icon}
+          </div>
+          <span className="font-bold text-sm text-slate-200 tracking-tight">{label}</span>
+        </div>
         <button
           onClick={handleToggle}
           disabled={processing}
-          className={`px-5 py-2 rounded-xl font-semibold text-sm transition disabled:opacity-50
-            ${recording ? 'bg-red-600 text-white recording-pulse' : 'bg-slate-800 text-white hover:bg-slate-700'}`}>
-          {processing ? processingText : recording ? '⏹ Stop' : buttonText}
+          className={`px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2
+            ${recording
+              ? 'bg-red-500 text-white shadow-lg shadow-red-500/20 recording-pulse'
+              : 'bg-medical-500/10 text-medical-400 hover:bg-medical-500 hover:text-white border border-medical-500/20'}`}>
+          {processing ? processingText : recording ? <><span className="w-2 h-2 bg-white rounded-full animate-pulse" /> Stop</> : buttonText}
         </button>
       </div>
-      {recording && <div className="mt-2 text-xs text-red-500 flex items-center gap-1.5"><span className="w-2 h-2 bg-red-500 rounded-full inline-block animate-pulse" />Recording...</div>}
-      {status && <div className="mt-2 text-xs text-slate-500">{status}</div>}
+      {status && <div className="mt-3 text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse pl-14">{status}</div>}
     </div>
   )
 }
 
 // ── Main Doctor Dashboard ─────────────────────────────────────────
 export default function DoctorDashboard() {
+  const router = useRouter()
+  const { hospital, doctor: currentDoc } = useApp()
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [loadingPt, setLoadingPt] = useState(false)
-  const [conversation, setConversation] = useState([]) // [{role, original, translated, audioB64}]
+  const [conversation, setConversation] = useState([])
   const [clinicalRecord, setClinical] = useState(null)
   const [loadingAI, setLoadingAI] = useState(false)
   const [discharge, setDischarge] = useState(null)
   const [error, setError] = useState('')
   const transcriptRef = useRef([])
+
+  useEffect(() => {
+    if (!hospital || !currentDoc) {
+      router.push('/auth')
+    }
+  }, [hospital, currentDoc, router])
 
   const patLang = record?.patient?.language || 'hi-IN'
   const langName = LANG_NAMES[patLang] || patLang
@@ -110,65 +130,37 @@ export default function DoctorDashboard() {
     setLoadingPt(false)
   }, [])
 
-  // Patient speaks → transcribe in patient lang → translate to English for doctor
   const handlePatientSpeech = useCallback(async (blob) => {
     const result = await patientSpeech(blob, patLang)
-    const turn = {
-      role: 'patient',
-      original: result.transcript,       // patient's language
-      translated: result.english,        // English for doctor
-      audioB64: null,
-    }
+    const turn = { role: 'patient', original: result.transcript, translated: result.english, audioB64: null }
     setConversation(prev => {
-      const updated = [...prev, turn]
-      transcriptRef.current = updated
-      return updated
+      const updated = [...prev, turn]; transcriptRef.current = updated; return updated
     })
   }, [patLang])
 
-  // Doctor speaks → transcribe English → translate to patient lang → play audio to patient
   const handleDoctorSpeech = useCallback(async (blob) => {
     const result = await doctorSpeech(blob, patLang)
-    // Play translated audio to patient immediately
     if (result.audio_b64) playAudio(result.audio_b64)
-    const turn = {
-      role: 'doctor',
-      original: result.english_transcript,  // what doctor said in English
-      translated: result.translated,         // what patient hears
-      audioB64: result.audio_b64,
-    }
+    const turn = { role: 'doctor', original: result.english_transcript, translated: result.translated, audioB64: result.audio_b64 }
     setConversation(prev => {
-      const updated = [...prev, turn]
-      transcriptRef.current = updated
-      return updated
+      const updated = [...prev, turn]; transcriptRef.current = updated; return updated
     })
   }, [patLang])
 
-  // Build full transcript from conversation turns and send to AI
   const handleConfirm = async () => {
     const turns = transcriptRef.current.length > 0 ? transcriptRef.current : conversation
     if (turns.length === 0) { setError('Record at least one voice turn before confirming'); return }
-
-    // Build readable transcript for Qwen2.5
-    const fullTranscript = turns.map(t =>
-      `${t.role === 'doctor' ? 'Doctor' : 'Patient'}: ${t.original || t.translated}`
-    ).join('\n')
-
+    const fullTranscript = turns.map(t => `${t.role === 'doctor' ? 'Doctor' : 'Patient'}: ${t.original || t.translated}`).join('\n')
     setLoadingAI(true); setError('')
     try {
-      const result = await saveConsultation({
-        patient_id: patientId,
-        transcript: fullTranscript,
-        patient_language: patLang,
-      })
+      const result = await saveConsultation({ patient_id: patientId, transcript: fullTranscript, patient_language: patLang })
       setClinical(result)
     } catch (e) { setError(e.message) }
     setLoadingAI(false)
   }
 
-  // Get discharge message + play audio
   const handleDischarge = async () => {
-    unlockAudio(); // Unlock on gesture
+    unlockAudio()
     try {
       const msg = await getDischargeMessage(patientId)
       setDischarge(msg)
@@ -176,181 +168,248 @@ export default function DoctorDashboard() {
     } catch (e) { setError(e.message) }
   }
 
+  if (!hospital || !currentDoc) return null
+
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-3xl mx-auto">
-        <Link href="/" className="text-slate-400 text-sm mb-4 block hover:text-slate-600">← Back</Link>
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">🩺 Doctor Dashboard</h1>
+    <div className="min-h-screen bg-medical-gradient">
+      <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
 
-        <PatientLoader onLoad={loadPatient} loading={loadingPt} accentColor="teal" />
+        {/* Left Sidebar: Patient Profile */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="medical-card h-full bg-slate-900/80">
+            <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+              <User className="w-3 h-3" /> Registration
+            </h2>
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm">{error}</div>}
+            <PatientLoader onLoad={loadPatient} loading={loadingPt} accentColor="medical" />
 
-        {/* Patient card */}
-        {record?.patient && (
-          <div className="bg-white rounded-2xl border-l-4 border-teal-600 p-5 mb-5 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-xl font-bold text-slate-800">{record.patient.name}</div>
-                <div className="text-slate-500 text-sm mt-1">
-                  Age {record.patient.age} · {record.patient.gender} · Speaks <strong>{langName}</strong>
-                  {' '}· Token #{record.patient.token_number} · Room {record.patient.room_number}
+            {error && <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex gap-2 items-start">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+            </div>}
+
+            {record?.patient && (
+              <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-20 h-20 rounded-3xl bg-medical-500/10 border border-medical-500/20 flex items-center justify-center mb-4">
+                    <User className="w-10 h-10 text-medical-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white uppercase tracking-tight">{record.patient.name}</h3>
+                  <p className="text-medical-400 text-[10px] font-bold tracking-widest uppercase mt-1">{record.patient.patient_id}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <StatBox label="Age" value={record.patient.age} />
+                  <StatBox label="Gender" value={record.patient.gender} />
+                  <StatBox label="Token" value={`#${record.patient.token_number}`} />
+                  <StatBox label="Language" value={langName} />
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-2">Treatment Journey</h4>
+                  <TimelineItem active={record.lab_status?.status === 'completed'} label="Laboratory" result={record.lab_status?.results} />
+                  <TimelineItem active={record.pharmacy_status?.status === 'dispensed'} label="Pharmacy" />
                 </div>
               </div>
-              <span className="text-xs font-mono bg-slate-100 text-slate-500 px-3 py-1 rounded-lg">{record.patient.patient_id}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Center: Consultation Area */}
+        <div className="lg:col-span-6 space-y-6">
+          {!record ? (
+            <div className="medical-card h-[600px] flex flex-col items-center justify-center text-center space-y-4 opacity-50 border-dashed">
+              <Stethoscope className="w-12 h-12 text-slate-700" />
+              <div className="text-slate-500 font-medium">Please select or scan a patient <br /> to begin consultation.</div>
             </div>
-          </div>
-        )}
-
-        {/* Previous dept status */}
-        {record?.lab_status?.status === 'completed' && (
-          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 mb-3 text-sm text-teal-800">
-            ✅ Lab results received: {JSON.stringify(record.lab_status.results)}
-          </div>
-        )}
-        {record?.pharmacy_status?.status === 'dispensed' && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3 text-sm text-green-800">
-            ✅ Medicines dispensed by pharmacy
-          </div>
-        )}
-
-        {/* ── BILINGUAL VOICE CONSULTATION ─────────────────────── */}
-        {record && !clinicalRecord && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm mb-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-700">Bilingual Voice Consultation</h2>
-              <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                Patient: {langName} ↔ Doctor: English
+          ) : !clinicalRecord ? (
+            <div className="flex flex-col h-full space-y-6 animate-in fade-in duration-500">
+              <div className="grid grid-cols-2 gap-4">
+                <VoiceTurn
+                  label={`Patient Interaction`}
+                  icon={<MessageSquare className="w-4 h-4" />}
+                  onResult={handlePatientSpeech}
+                  buttonText={`Rec Patient (${langName})`}
+                  processingText="Analyzing Voice..."
+                />
+                <VoiceTurn
+                  label="Doctor Response"
+                  icon={<Mic className="w-4 h-4" />}
+                  onResult={handleDoctorSpeech}
+                  buttonText="Rec Doctor (English)"
+                  processingText="Synthesizing..."
+                />
               </div>
-            </div>
 
-            {/* Voice buttons */}
-            <div className="space-y-3 mb-5">
-              <VoiceTurn
-                label={`🎤 Patient speaks — ${langName}`}
-                color="border-blue-100 bg-blue-50"
-                onResult={handlePatientSpeech}
-                buttonText={`Record Patient (${langName})`}
-                processingText="Transcribing..."
-              />
-              <VoiceTurn
-                label="🩺 Doctor speaks — English → translated to patient"
-                color="border-teal-100 bg-teal-50"
-                onResult={handleDoctorSpeech}
-                buttonText="Record Doctor (English)"
-                processingText="Translating + speaking..."
-              />
-            </div>
+              <div className="medical-card flex-1 flex flex-col min-h-[400px]">
+                <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <History className="w-3 h-3" /> Live Consultation Transcript
+                  </h3>
+                  <div className="text-[10px] bg-medical-500/10 text-medical-400 px-2 py-1 rounded-full border border-medical-500/20 font-bold uppercase tracking-widest">
+                    Bilingual Mode Active
+                  </div>
+                </div>
 
-            {/* Conversation transcript */}
-            {conversation.length > 0 && (
-              <div className="border border-slate-200 rounded-xl p-4 mb-4 max-h-60 overflow-y-auto space-y-3">
-                <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Conversation</p>
-                {conversation.map((turn, i) => (
-                  <div key={i} className={`flex gap-3 ${turn.role === 'doctor' ? 'flex-row-reverse' : ''}`}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
-                      ${turn.role === 'doctor' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {turn.role === 'doctor' ? 'Dr' : 'Pt'}
+                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                  {conversation.length === 0 && (
+                    <div className="h-full flex items-center justify-center text-slate-700 italic text-sm">
+                      No conversation data yet. Use the buttons above to record.
                     </div>
-                    <div className={`rounded-xl p-3 text-sm max-w-xs
-                      ${turn.role === 'doctor' ? 'bg-teal-50' : 'bg-blue-50'}`}>
-                      <div className="font-medium text-slate-800">{turn.original}</div>
-                      {turn.translated && turn.translated !== turn.original && (
-                        <div className="text-slate-400 text-xs mt-1 italic flex items-center gap-1.5">
-                          {turn.translated}
-                          <SpeakButton
-                            text={turn.translated}
-                            language={turn.role === 'doctor' ? patLang : 'en-IN'}
-                          />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        {turn.audioB64 && (
-                          <button onClick={() => playAudio(turn.audioB64)}
-                            className="text-xs text-teal-600 hover:underline">🔊 Replay</button>
-                        )}
-                        {!turn.audioB64 && turn.original && (
-                          <SpeakButton
-                            text={turn.original}
-                            language={turn.role === 'patient' ? patLang : 'en-IN'}
-                            label="Speak"
-                          />
+                  )}
+                  {conversation.map((turn, i) => (
+                    <div key={i} className={`flex gap-4 ${turn.role === 'doctor' ? 'flex-row-reverse' : ''}`}>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border 
+                        ${turn.role === 'doctor' ? 'bg-medical-500/20 border-medical-500/30 text-medical-400' : 'bg-slate-800 border-white/5 text-slate-400'}`}>
+                        {turn.role === 'doctor' ? <Stethoscope className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                      </div>
+                      <div className={`max-w-[85%] rounded-2xl p-4 shadow-lg
+                        ${turn.role === 'doctor' ? 'bg-medical-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-white/5'}`}>
+                        <div className="font-medium text-sm leading-relaxed">{turn.original}</div>
+                        {turn.translated && turn.translated !== turn.original && (
+                          <div className="mt-3 pt-3 border-t border-white/10 text-xs italic flex items-center justify-between gap-4">
+                            <span className="opacity-60">{turn.translated}</span>
+                            <SpeakButton text={turn.translated} language={turn.role === 'doctor' ? patLang : 'en-IN'} size="sm" />
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
 
-            <button onClick={handleConfirm} disabled={loadingAI || conversation.length === 0}
-              className="w-full bg-teal-700 text-white py-4 rounded-xl font-bold text-lg hover:bg-teal-600 disabled:opacity-50 transition">
-              {loadingAI ? '🤖 AI generating clinical record...' : 'CONFIRM & SEND TO DEPARTMENTS'}
-            </button>
-          </div>
-        )}
-
-        {/* Clinical record */}
-        {clinicalRecord && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-green-200 mb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 text-lg">Clinical Record</h2>
-              <div className="flex items-center gap-3">
-                <a
-                  href={getClinicalPDF_URL(patientId)}
-                  download={`ClinicalRecord_${patientId}.pdf`}
-                  className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
-                >
-                  📄 Download PDF
-                </a>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${SEV[clinicalRecord.severity] || 'bg-slate-100 text-slate-600'}`}>
-                  {clinicalRecord.severity}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <Row label="Diagnosis" value={clinicalRecord.diagnosis} />
-              {clinicalRecord.diagnosis && <SpeakButton text={clinicalRecord.diagnosis} language={patLang} label={`Speak in ${langName}`} size="md" />}
-            </div>
-            <Row label="Symptoms" value={clinicalRecord.symptoms?.join(', ')} />
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <Row label="Prescriptions" value={clinicalRecord.prescriptions?.join(' | ')} />
-              {clinicalRecord.prescriptions?.length > 0 && <SpeakButton text={clinicalRecord.prescriptions.join(', ')} language={patLang} label={`Speak in ${langName}`} size="md" />}
-            </div>
-            <Row label="Lab Tests" value={clinicalRecord.lab_tests?.join(', ')} />
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <Row label="Follow-up" value={clinicalRecord.followup} />
-              {clinicalRecord.followup && <SpeakButton text={clinicalRecord.followup} language={patLang} label={`Speak in ${langName}`} size="md" />}
-            </div>
-            <Row label="Notes" value={clinicalRecord.clinical_notes} />
-            <Row label="Routed to" value={clinicalRecord.route_to?.join(' + ')} />
-
-            {clinicalRecord.severity === 'emergency' && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800">
-                🚨 Emergency alert sent to duty team via SMS
-              </div>
-            )}
-
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              {!discharge ? (
-                <button onClick={handleDischarge}
-                  className="text-sm bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg hover:bg-amber-100 transition">
-                  🔊 Speak discharge message to patient in {langName}
+                <button onClick={handleConfirm} disabled={loadingAI || conversation.length === 0}
+                  className="w-full mt-6 bg-medical-500 hover:bg-medical-400 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.15em] disabled:opacity-50 transition-all shadow-lg shadow-medical-500/10 flex items-center justify-center gap-2 group">
+                  {loadingAI ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing Consultation...</> : <>Generate Clinical Record <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" /></>}
                 </button>
-              ) : (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                  <div className="text-xs text-amber-400 mb-1">Discharge message ({langName})</div>
-                  <div className="text-sm text-amber-900 font-medium">{discharge.message}</div>
-                  {discharge.audio_b64 && (
+              </div>
+            </div>
+          ) : (
+            <div className="medical-card space-y-6 animate-in zoom-in-95 duration-500 border-green-500/30">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-3">
+                  <ClipboardList className="w-5 h-5 text-medical-400" /> Clinical Intelligence Order
+                </h3>
+                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${SEV[clinicalRecord.severity]}`}>
+                  {clinicalRecord.severity} Severity
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <RecordField label="Diagnosis" value={clinicalRecord.diagnosis} icon={<AlertCircle className="w-4 h-4" />} canSpeak={true} lang={patLang} />
+                <RecordField label="Symptoms" value={clinicalRecord.symptoms?.join(', ')} icon={<History className="w-4 h-4" />} />
+                <RecordField label="Prescriptions" value={clinicalRecord.prescriptions?.join(', ')} icon={<Pill className="w-4 h-4" />} canSpeak={true} lang={patLang} />
+                <RecordField label="Laboratory Orders" value={clinicalRecord.lab_tests?.join(', ')} icon={<Microscope className="w-4 h-4" />} />
+              </div>
+
+              <div className="glass-card bg-amber-500/10 border-amber-500/20 p-6 rounded-3xl">
+                <h4 className="text-amber-500 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <PhoneCall className="w-4 h-4 text-amber-500" /> Patient Instruction & Discharge
+                </h4>
+                {!discharge ? (
+                  <button onClick={handleDischarge}
+                    className="w-full bg-amber-500/20 hover:bg-amber-500 text-amber-500 hover:text-white border border-amber-500/30 px-6 py-4 rounded-2xl font-bold text-sm transition-all transition-all duration-300">
+                    Generate Bilingual Discharge Speech
+                  </button>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-amber-200/80 italic text-sm leading-relaxed">&ldquo;{discharge.message}&rdquo;</p>
                     <button onClick={() => playAudio(discharge.audio_b64)}
-                      className="text-xs text-amber-600 mt-2 hover:underline">🔊 Play again</button>
-                  )}
+                      className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400">
+                      <Play className="w-4 h-4 fill-current" /> REPLAY IN {langName.toUpperCase()}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Sidebar: Actions & PDF */}
+        <div className="lg:col-span-3 space-y-6">
+          {clinicalRecord && (
+            <div className="medical-card space-y-6 animate-in slide-in-from-right-4 duration-500">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4">Actions</h3>
+              <a
+                href={getClinicalPDF_URL(patientId)}
+                download={`ClinicalRecord_${patientId}.pdf`}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-2xl p-4 flex items-center gap-3 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 group-hover:bg-red-500 group-hover:text-white transition-all">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-sm">Record PDF</div>
+                  <div className="text-[10px] text-slate-500">HIPAA Secured Bundle</div>
+                </div>
+              </a>
+
+              {clinicalRecord.severity === 'emergency' && (
+                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+                    <AlertCircle className="w-4 h-4" /> Emergency Protocol
+                  </div>
+                  <p className="text-[10px] opacity-70">Duty team has been notified via priority SMS. Specialized response initiated.</p>
                 </div>
               )}
+
+              <button onClick={() => window.location.reload()} className="w-full p-4 rounded-2xl border border-white/5 text-slate-500 hover:text-white hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest">
+                Next Patient
+              </button>
+            </div>
+          )}
+
+          <div className="medical-card">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4 mb-4">Doctor Session</h3>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-medical-500/10 flex items-center justify-center text-medical-400">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-white">Dr. {currentDoc?.name}</div>
+                <div className="text-[10px] text-slate-500 uppercase tracking-widest">{currentDoc?.speciality || 'Medical Officer'}</div>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
+    </div>
+  )
+}
+
+function StatBox({ label, value }) {
+  return (
+    <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 shadow-sm">
+      <div className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] mb-1.5">{label}</div>
+      <div className="text-base font-bold text-white tracking-tight">{value}</div>
+    </div>
+  )
+}
+
+function TimelineItem({ active, label, result }) {
+  return (
+    <div className={`flex items-start gap-4 ${active ? 'opacity-100' : 'opacity-30'}`}>
+      <div className={`w-6 h-6 rounded-lg shrink-0 flex items-center justify-center mt-0.5 border
+        ${active ? 'bg-medical-500/20 border-medical-500/30 text-medical-400' : 'bg-slate-800 border-white/5 text-slate-600'}`}>
+        <CheckCircle2 className="w-3.5 h-3.5" />
+      </div>
+      <div>
+        <div className="text-xs font-bold text-slate-200 uppercase tracking-wide">{label}</div>
+        {result && <div className="text-[10px] text-slate-500 mt-1 font-medium">{JSON.stringify(result)}</div>}
+      </div>
+    </div>
+  )
+}
+
+function RecordField({ label, value, icon, canSpeak, lang }) {
+  if (!value) return null
+  return (
+    <div className="space-y-2 border-b border-white/5 pb-4 last:border-0">
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
+          {icon} {label}
+        </label>
+        {canSpeak && <SpeakButton text={value} language={lang} size="sm" />}
+      </div>
+      <div className="text-slate-300 font-medium leading-relaxed">{value}</div>
     </div>
   )
 }

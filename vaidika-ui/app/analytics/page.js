@@ -1,35 +1,57 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getAnalytics } from '@/lib/api'
+import { useApp } from '@/lib/AppContext'
+import {
+  BarChart3,
+  Users,
+  Clock,
+  CheckCircle2,
+  Activity,
+  AlertTriangle,
+  RefreshCcw,
+  ArrowLeft,
+  PieChart,
+  User,
+  Languages
+} from 'lucide-react'
 
 const LANG_NAMES = {
-  'hi-IN':'Hindi','ta-IN':'Tamil','te-IN':'Telugu','kn-IN':'Kannada',
-  'ml-IN':'Malayalam','bn-IN':'Bengali','mr-IN':'Marathi','gu-IN':'Gujarati','en-IN':'English'
+  'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu', 'kn-IN': 'Kannada',
+  'ml-IN': 'Malayalam', 'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati', 'en-IN': 'English'
 }
 
-function StatCard({ label, value, sub, color='bg-white' }) {
+function StatCard({ label, value, sub, icon, color = 'text-medical-400' }) {
   return (
-    <div className={`${color} rounded-2xl p-5 shadow-sm`}>
-      <div className="text-3xl font-black text-slate-800">{value ?? '—'}</div>
-      <div className="font-semibold text-slate-600 mt-1">{label}</div>
-      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+    <div className="medical-card group">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center ${color} border border-white/5 group-hover:bg-medical-500 group-hover:text-white transition-all`}>
+          {icon}
+        </div>
+        <div className="text-2xl font-black text-white">{value ?? '0'}</div>
+      </div>
+      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</div>
+      {sub && <div className="text-[10px] text-slate-600 mt-1 uppercase font-bold">{sub}</div>}
     </div>
   )
 }
 
-function BarChart({ data, colorClass='bg-blue-500' }) {
-  if (!data || Object.keys(data).length === 0) return <div className="text-slate-400 text-sm">No data</div>
+function BarChart({ data, colorClass = 'bg-medical-500' }) {
+  if (!data || Object.keys(data).length === 0) return <div className="text-slate-600 text-xs italic">No clinical data recorded.</div>
   const max = Math.max(...Object.values(data))
   return (
-    <div className="space-y-2">
-      {Object.entries(data).sort((a,b)=>b[1]-a[1]).map(([k,v]) => (
-        <div key={k} className="flex items-center gap-3">
-          <div className="w-24 text-xs text-slate-500 text-right shrink-0">{LANG_NAMES[k] || k}</div>
-          <div className="flex-1 bg-slate-100 rounded-full h-5 relative">
-            <div className={`${colorClass} h-5 rounded-full transition-all`} style={{width:`${(v/max)*100}%`}}/>
+    <div className="space-y-4">
+      {Object.entries(data).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+        <div key={k} className="space-y-1.5">
+          <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+            <span className="text-slate-400">{LANG_NAMES[k] || k}</span>
+            <span className="text-medical-400">{v} Patients</span>
           </div>
-          <div className="text-xs font-bold text-slate-600 w-6">{v}</div>
+          <div className="flex-1 bg-slate-900 border border-white/5 rounded-full h-2 relative overflow-hidden">
+            <div className={`${colorClass} h-full rounded-full transition-all duration-1000`} style={{ width: `${(v / max) * 100}%` }} />
+          </div>
         </div>
       ))}
     </div>
@@ -37,126 +59,163 @@ function BarChart({ data, colorClass='bg-blue-500' }) {
 }
 
 export default function Analytics() {
-  const [data, setData]     = useState(null)
+  const router = useRouter()
+  const { hospital } = useApp()
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!hospital) {
+      router.push('/auth')
+    }
+  }, [hospital, router])
 
   const load = async () => {
     setLoading(true)
-    try { setData(await getAnalytics()) } catch {}
+    try { setData(await getAnalytics()) } catch { }
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (hospital) load() }, [hospital])
+
+  if (!hospital) return null
 
   if (loading) return (
-    <div className="min-h-screen bg-violet-50 flex items-center justify-center">
-      <div className="text-violet-400 text-lg">Loading analytics...</div>
+    <div className="min-h-screen bg-medical-gradient flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-medical-500/20 border-t-medical-500 rounded-full animate-spin" />
+      <div className="text-medical-400 text-[10px] font-black uppercase tracking-[0.2em]">Aggregating Clinical Intelligence...</div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-violet-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-medical-gradient p-6 lg:p-12">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
           <div>
-            <Link href="/" className="text-violet-400 text-sm mb-1 block hover:text-violet-600">← Back</Link>
-            <h1 className="text-2xl font-bold text-slate-800">📊 Analytics Dashboard</h1>
+            <Link href="/" className="text-slate-500 hover:text-white transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest mb-2">
+              <ArrowLeft className="w-3 h-3" /> Back to Dashboard
+            </Link>
+            <h1 className="text-4xl font-black text-white tracking-tight">System <span className="text-medical-400 italic">Insights</span></h1>
           </div>
-          <button onClick={load} className="text-sm bg-violet-100 text-violet-700 px-4 py-2 rounded-xl hover:bg-violet-200 transition">
-            🔄 Refresh
+          <button onClick={load} className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-white/5 text-slate-300 px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all">
+            <RefreshCcw className="w-4 h-4" /> Sync Data
           </button>
         </div>
 
         {/* Top stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Patients"     value={data?.total_patients}      color="bg-white" />
-          <StatCard label="Today"              value={data?.today_patients}      color="bg-white" />
-          <StatCard label="Checked In"         value={data?.checked_in}          color="bg-white" />
-          <StatCard label="Consultations"      value={data?.total_consultations} color="bg-white" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard label="Total Patients" value={data?.total_patients} icon={<Users className="w-5 h-5" />} />
+          <StatCard label="Today Priority" value={data?.today_patients} icon={<Clock className="w-5 h-5" />} sub="Daily Throughput" />
+          <StatCard label="Active Status" value={data?.checked_in} icon={<Activity className="w-5 h-5" />} />
+          <StatCard label="Consultations" value={data?.total_consultations} icon={<CheckCircle2 className="w-5 h-5" />} />
         </div>
 
         {/* Alert + dept row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <StatCard label="Emergency Alerts Sent" value={data?.emergency_alerts}
-            color={data?.emergency_alerts > 0 ? 'bg-red-50 border border-red-200' : 'bg-white'} />
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="font-semibold text-slate-700 mb-3">🔬 Lab</div>
-            <div className="flex justify-between text-sm">
-              <span className="text-green-600">✓ Completed: <strong>{data?.lab?.completed}</strong></span>
-              <span className="text-yellow-600">⏳ Pending: <strong>{data?.lab?.pending}</strong></span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className={`medical-card ${data?.emergency_alerts > 0 ? 'border-red-500/30 bg-red-500/5' : ''}`}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500" /> Critical Alerts
+              </h3>
+              <span className="text-2xl font-black text-white">{data?.emergency_alerts || 0}</span>
             </div>
-            <div className="mt-2 bg-slate-100 rounded-full h-2">
-              {data?.lab && (data.lab.completed + data.lab.pending) > 0 && (
-                <div className="bg-green-500 h-2 rounded-full"
-                  style={{width:`${(data.lab.completed/(data.lab.completed+data.lab.pending))*100}%`}}/>
-              )}
-            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed uppercase font-bold tracking-wider">
+              Priority SMS interventions triggered today. Duty response protocol active.
+            </p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="font-semibold text-slate-700 mb-3">💊 Pharmacy</div>
-            <div className="flex justify-between text-sm">
-              <span className="text-green-600">✓ Dispensed: <strong>{data?.pharmacy?.dispensed}</strong></span>
-              <span className="text-yellow-600">⏳ Pending: <strong>{data?.pharmacy?.pending}</strong></span>
-            </div>
-            <div className="mt-2 bg-slate-100 rounded-full h-2">
-              {data?.pharmacy && (data.pharmacy.dispensed + data.pharmacy.pending) > 0 && (
-                <div className="bg-green-500 h-2 rounded-full"
-                  style={{width:`${(data.pharmacy.dispensed/(data.pharmacy.dispensed+data.pharmacy.pending))*100}%`}}/>
-              )}
-            </div>
-          </div>
+
+          <DeptCard title="Laboratoy Diagnostics" icon={<PieChart className="w-4 h-4 text-medical-400" />} completed={data?.lab?.completed} pending={data?.lab?.pending} />
+          <DeptCard title="Pharmacy Dispensation" icon={<PieChart className="w-4 h-4 text-orange-400" />} completed={data?.pharmacy?.dispensed} pending={data?.pharmacy?.pending} color="orange" />
         </div>
 
         {/* Severity + Language breakdown */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-bold text-slate-700 mb-4">Severity Breakdown</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="medical-card">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-8 border-b border-white/5 pb-4">Severity Triage Analysis</h3>
             {data?.severity_breakdown && Object.keys(data.severity_breakdown).length > 0 ? (
-              <div className="space-y-2">
-                {['emergency','high','medium','low'].map(s => {
+              <div className="space-y-6">
+                {['emergency', 'high', 'medium', 'low'].map(s => {
                   const count = data.severity_breakdown[s] || 0
-                  if (!count) return null
-                  const colors = { emergency:'bg-red-500', high:'bg-orange-400', medium:'bg-yellow-400', low:'bg-green-500' }
+                  const colors = { emergency: 'bg-red-500', high: 'bg-orange-400', medium: 'bg-yellow-400', low: 'bg-green-500' }
                   const max = Math.max(...Object.values(data.severity_breakdown))
                   return (
-                    <div key={s} className="flex items-center gap-3">
-                      <div className="w-20 text-xs text-slate-500 text-right capitalize">{s}</div>
-                      <div className="flex-1 bg-slate-100 rounded-full h-5">
-                        <div className={`${colors[s]} h-5 rounded-full`} style={{width:`${(count/max)*100}%`}}/>
+                    <div key={s} className="space-y-1.5">
+                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                        <span className="text-slate-400">{s} Priority</span>
+                        <span className="text-white">{count}</span>
                       </div>
-                      <div className="text-xs font-bold text-slate-600 w-5">{count}</div>
+                      <div className="flex-1 bg-slate-900 border border-white/5 rounded-full h-2 relative overflow-hidden">
+                        <div className={`${colors[s]} h-full rounded-full transition-all duration-1000`} style={{ width: `${(count / max) * 100}%` }} />
+                      </div>
                     </div>
                   )
                 })}
               </div>
-            ) : <div className="text-slate-400 text-sm">No consultations yet</div>}
+            ) : <div className="text-slate-600 text-xs italic">No triage data available.</div>}
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-bold text-slate-700 mb-4">Patient Languages</h3>
-            <BarChart data={data?.language_breakdown} colorClass="bg-violet-400" />
+
+          <div className="medical-card">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-8 border-b border-white/5 pb-4 flex items-center gap-2">
+              <Languages className="w-4 h-4" /> Linguistic Breakdown
+            </h3>
+            <BarChart data={data?.language_breakdown} colorClass="bg-medical-500" />
           </div>
         </div>
 
         {/* Recent patients */}
         {data?.recent_patients?.length > 0 && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-bold text-slate-700 mb-4">Recent Patients</h3>
-            <div className="space-y-2">
+          <div className="medical-card">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <History className="w-4 h-4" /> Recent Access Logs
+            </h3>
+            <div className="space-y-3">
               {data.recent_patients.map(p => (
-                <div key={p.patient_id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                  <div>
-                    <span className="font-medium text-slate-800 text-sm">{p.name}</span>
-                    <span className="text-slate-400 text-xs ml-2">Token #{p.token_number} · Room {p.room_number}</span>
+                <div key={p.patient_id} className="flex items-center justify-between p-4 bg-slate-900/40 border border-white/5 rounded-2xl group hover:border-medical-500/30 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-200 text-sm uppercase tracking-tight">{p.name}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Token #{p.token_number} · Room {p.room_number}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">{LANG_NAMES[p.language] || p.language}</span>
-                    <span className="text-xs font-mono text-slate-300">{p.patient_id}</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-black text-medical-400 uppercase tracking-widest">{LANG_NAMES[p.language] || p.language}</span>
+                    <span className="text-[10px] font-mono text-slate-600 mt-1">{p.patient_id}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function DeptCard({ title, icon, completed, pending, color = 'medical' }) {
+  const total = (completed || 0) + (pending || 0)
+  const percent = total > 0 ? (completed / total) * 100 : 0
+  const colorClasses = color === 'orange' ? 'bg-orange-500 text-orange-400' : 'bg-medical-500 text-medical-400'
+
+  return (
+    <div className="medical-card border-white/5">
+      <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+        {icon} {title}
+      </h3>
+      <div className="flex justify-between items-end mb-4">
+        <div>
+          <div className="text-2xl font-black text-white">{completed || 0}</div>
+          <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Completed</div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-black text-white">{pending || 0}</div>
+          <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">In Queue</div>
+        </div>
+      </div>
+      <div className="bg-slate-900 border border-white/5 rounded-full h-1.5 overflow-hidden">
+        <div className={`${color === 'orange' ? 'bg-orange-500' : 'bg-medical-500'} h-full transition-all duration-1000`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   )

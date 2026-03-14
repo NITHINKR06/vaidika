@@ -5,14 +5,41 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #0f172a; -webkit-font-smoothing: antialiased; }
+
+@layer base {
+  body {
+    @apply bg-hospital-secondary text-slate-200 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl;
+  }
+  
+  .glass-button {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/15 transition-all duration-300;
+  }
+
+  .medical-card {
+    @apply bg-slate-900/50 border border-slate-800 rounded-3xl p-6 hover:border-medical-500/50 transition-all duration-300;
+  }
+
+  .nav-blur {
+    @apply sticky top-0 z-50 bg-hospital-secondary/80 backdrop-blur-xl border-b border-white/5;
+  }
+}
 
 /* recording pulse animation */
-@keyframes rec-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-  50%       { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+@keyframes recording-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
-.recording-pulse { animation: rec-pulse 1.2s infinite; }
+.recording-pulse {
+  animation: recording-pulse 2s infinite;
+}
 
 /* severity colours */
 .sev-low       { background:#dcfce7; color:#166534; }

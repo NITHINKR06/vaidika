@@ -50,26 +50,50 @@ def health():
 @app.post('/register')
 def register_patient(req: PatientRegister):
     """Register patient → returns patient_id, token, room, QR code (base64 PNG)."""
-    patient_id = f'VK-2025-{str(uuid.uuid4())[:5].upper()}'
     conn = get_db()
+    
+    # Calculate new token and room
     count = conn.execute('SELECT COUNT(*) FROM patients').fetchone()[0]
     token_number = count + 1
     room_number = (count % 3) + 1
-
-    qr_code = generate_patient_qr(patient_id, req.name, token_number, room_number)
-
-    conn.execute(
-        'INSERT INTO patients VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-        (patient_id, req.name, req.age, req.gender, req.language,
-         req.aadhaar_last4, token_number, room_number, qr_code, 0,
-         datetime.datetime.now().isoformat())
-    )
-    conn.commit(); conn.close()
+    
+    if req.patient_id:
+        # Re-registering existing patient
+        patient_id = req.patient_id
+        row = conn.execute('SELECT * FROM patients WHERE patient_id=?', (patient_id,)).fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(404, 'Existing patient ID not found')
+        
+        # We reuse the ID but update the visit details
+        qr_code = generate_patient_qr(patient_id, req.name, token_number, room_number)
+        conn.execute(
+            '''UPDATE patients SET 
+               name=?, age=?, gender=?, language=?, aadhaar_last4=?, 
+               token_number=?, room_number=?, qr_code=?, checked_in=0, created_at=? 
+               WHERE patient_id=?''',
+            (req.name, req.age, req.gender, req.language, req.aadhaar_last4,
+             token_number, room_number, qr_code, datetime.datetime.now().isoformat(), patient_id)
+        )
+    else:
+        # New patient registration
+        patient_id = f'VK-2025-{str(uuid.uuid4())[:5].upper()}'
+        qr_code = generate_patient_qr(patient_id, req.name, token_number, room_number)
+        conn.execute(
+            'INSERT INTO patients VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+            (patient_id, req.name, req.age, req.gender, req.language,
+             req.aadhaar_last4, token_number, room_number, qr_code, 0,
+             datetime.datetime.now().isoformat())
+        )
+    
+    conn.commit()
+    conn.close()
 
     return {
         'patient_id': patient_id, 'token_number': token_number,
         'room_number': room_number, 'name': req.name,
         'language': req.language, 'qr_code': qr_code, 'status': 'registered',
+        'is_re_registration': bool(req.patient_id)
     }
 
 

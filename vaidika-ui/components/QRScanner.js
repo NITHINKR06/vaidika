@@ -2,12 +2,11 @@
 // Drop-in QR scanner component — works in any portal
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { X, QrCode, AlertCircle } from 'lucide-react'
 
 export default function QRScanner({ onScan, onClose }) {
-  const divRef = useRef(null)
   const scannerRef = useRef(null)
   const [error, setError] = useState('')
-
   const hasScanned = useRef(false)
 
   useEffect(() => {
@@ -16,8 +15,14 @@ export default function QRScanner({ onScan, onClose }) {
 
     const init = async () => {
       try {
-        const { Html5Qrcode } = await import('html5-qrcode')
+        const Html5QrcodeModule = await import('html5-qrcode')
+        const Html5Qrcode = Html5QrcodeModule.Html5Qrcode || (Html5QrcodeModule.default ? Html5QrcodeModule.default.Html5Qrcode : null)
+
+        if (!Html5Qrcode) throw new Error('Scanner module failed to initialize')
         if (isCancelled) return
+
+        const container = document.getElementById('qr-reader')
+        if (!container) return
 
         scanner = new Html5Qrcode('qr-reader')
         scannerRef.current = scanner
@@ -40,7 +45,7 @@ export default function QRScanner({ onScan, onClose }) {
         )
       } catch (e) {
         if (!isCancelled) {
-          setError('Camera not available. Enter Patient ID manually.')
+          setError('Clinical vision system offline. Please enter identification manually.')
         }
       }
     }
@@ -58,24 +63,40 @@ export default function QRScanner({ onScan, onClose }) {
   }, [onScan])
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-slate-800">Scan Patient QR Code</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+    <div className="fixed inset-0 bg-hospital-secondary/90 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+      <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden border-white/10 shadow-2xl">
+        <div className="p-6 flex justify-between items-center border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-medical-500 flex items-center justify-center text-white">
+              <QrCode className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-black text-white uppercase tracking-widest">Protocol Scanner</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {error ? (
-          <div className="text-red-600 text-sm text-center py-4">{error}</div>
-        ) : (
-          <div id="qr-reader" ref={divRef} className="w-full rounded-xl overflow-hidden [&_video]:!w-full [&_video]:!object-cover [&_canvas]:!hidden" />
-        )}
+        <div className="p-6">
+          {error ? (
+            <div className="text-red-400 text-[10px] font-bold text-center py-10 flex flex-col items-center gap-3 uppercase tracking-widest leading-loose">
+              <AlertCircle className="w-8 h-8 opacity-50" />
+              {error}
+            </div>
+          ) : (
+            <div className="relative group">
+              <div id="qr-reader" className="w-full rounded-2xl overflow-hidden [&_video]:!w-full [&_video]:!object-cover [&_canvas]:!hidden border-2 border-slate-800 group-hover:border-medical-500/50 transition-all duration-500" />
+              <div className="absolute inset-0 pointer-events-none border-[20px] border-slate-900/50 border-double m-4 rounded-xl opacity-20" />
+            </div>
+          )}
 
-        <p className="text-xs text-slate-400 text-center mt-3">Point camera at the QR code on patient's token slip</p>
-        <button onClick={onClose}
-          className="w-full mt-3 bg-slate-100 text-slate-700 py-2 rounded-xl text-sm hover:bg-slate-200 transition">
-          Cancel
-        </button>
+          <p className="text-[10px] text-slate-500 font-bold text-center mt-6 uppercase tracking-widest">Aligh QR code within the visual frame</p>
+
+          <button onClick={onClose}
+            className="w-full mt-6 bg-slate-800 text-slate-300 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-all">
+            Dismiss
+          </button>
+        </div>
       </div>
     </div>
   )

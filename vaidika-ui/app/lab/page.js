@@ -1,9 +1,21 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
 import SpeakButton from '@/components/SpeakButton'
 import { getFullRecord, updateDepartment } from '@/lib/api'
+import { useApp } from '@/lib/AppContext'
+import {
+  Microscope,
+  FlaskConical,
+  CheckCircle2,
+  History,
+  AlertCircle,
+  ArrowLeft,
+  Send,
+  Languages
+} from 'lucide-react'
 
 const LANG_NAMES = {
   'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu', 'kn-IN': 'Kannada',
@@ -11,6 +23,8 @@ const LANG_NAMES = {
 }
 
 export default function LabPortal() {
+  const router = useRouter()
+  const { hospital } = useApp()
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [results, setResults] = useState({})
@@ -18,6 +32,12 @@ export default function LabPortal() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmit] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!hospital) {
+      router.push('/auth')
+    }
+  }, [hospital, router])
 
   const loadPatient = useCallback(async (id) => {
     setPatientId(id); setLoading(true); setError('')
@@ -42,80 +62,119 @@ export default function LabPortal() {
   const langName = LANG_NAMES[patLang] || patLang
   const severity = record?.consultation?.severity
 
+  if (!hospital) return null
+
   return (
-    <div className="min-h-screen bg-cyan-50 p-6">
-      <div className="max-w-2xl mx-auto">
-        <Link href="/" className="text-cyan-400 text-sm mb-4 block hover:text-cyan-600">← Back</Link>
-        <h1 className="text-2xl font-bold text-cyan-900 mb-6">🔬 Laboratory Portal</h1>
+    <div className="min-h-screen bg-medical-gradient p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-medical-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-medical-500/20">
+              <Microscope className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-tight uppercase">Laboratory <span className="text-medical-400">Portal</span></h1>
+          </div>
+          <Link href="/" className="text-slate-500 hover:text-white transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+            <ArrowLeft className="w-3 h-3" /> Dashboard
+          </Link>
+        </div>
 
-        <PatientLoader onLoad={loadPatient} loading={loading} accentColor="cyan" />
+        <div className="medical-card">
+          <PatientLoader onLoad={loadPatient} loading={loading} accentColor="medical" />
+        </div>
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm">{error}</div>}
+        {error && <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex gap-3 items-center">
+          <AlertCircle className="w-4 h-4" /> {error}
+        </div>}
 
         {record?.patient && (
-          <div className="bg-white rounded-2xl border-l-4 border-cyan-500 p-4 mb-5 shadow-sm flex justify-between items-center">
-            <div>
-              <div className="font-bold text-slate-800">{record.patient.name}</div>
-              <div className="text-slate-500 text-sm">Age {record.patient.age} · {record.patient.patient_id} · Speaks <strong>{langName}</strong></div>
+          <div className="medical-card flex justify-between items-center border-white/5 animate-in fade-in duration-500">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-medical-400 border border-white/5">
+                <FlaskConical className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-200 uppercase tracking-tight">{record.patient.name}</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
+                  {record.patient.patient_id} · {record.patient.age}Y · <Languages className="w-3 h-3" /> {langName}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {severity && (
-                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
-                  severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {severity}
-                </span>
-              )}
-            </div>
+            {severity && (
+              <span className={`text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest 
+                ${severity === 'emergency' ? 'bg-red-500/20 text-red-400' :
+                  severity === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-800 text-slate-400'}`}>
+                {severity} Severity
+              </span>
+            )}
           </div>
         )}
 
         {record?.lab_status?.status === 'completed' && !done && (
-          <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-4 text-sm text-teal-800">
-            ℹ️ Results already submitted for this patient.
+          <div className="p-4 rounded-2xl bg-medical-500/10 border border-medical-500/20 text-medical-400 text-xs flex gap-3 items-center">
+            <History className="w-4 h-4" /> This protocol has already been reported.
           </div>
         )}
 
         {tests.length > 0 && !done && record?.lab_status?.status !== 'completed' && (
-          <div className="space-y-3 mb-5">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-slate-500">Tests ordered by doctor — fill all results:</p>
-              <SpeakButton
-                text={`You need to do the following tests: ${tests.join(', ')}`}
-                language={patLang}
-                label={`Speak all in ${langName}`}
-                size="md"
-              />
-            </div>
-            {tests.map(test => (
-              <div key={test} className="bg-white rounded-2xl p-4 shadow-sm">
-                <div className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-cyan-400 rounded-full" />
-                  {test}
-                  <SpeakButton text={test} language={patLang} />
-                </div>
-                <input placeholder={`Result for ${test}`} value={results[test] || ''}
-                  onChange={e => setResults({ ...results, [test]: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400" />
+          <div className="space-y-4 pb-12">
+            <div className="medical-card border-white/5 bg-slate-900/40">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Required Diagnostics</p>
+                <SpeakButton
+                  text={`You need to do the following tests: ${tests.join(', ')}`}
+                  language={patLang}
+                  label={`Explain in ${langName}`}
+                  size="sm"
+                />
               </div>
-            ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {tests.map(test => (
+                <div key={test} className="medical-card bg-slate-800/20 border-white/5 group hover:border-medical-500/30">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="font-bold text-slate-200 text-sm flex items-center gap-3">
+                      <div className="w-2 h-2 bg-medical-500 rounded-full group-hover:animate-pulse" />
+                      {test}
+                    </div>
+                    <SpeakButton text={test} language={patLang} size="sm" />
+                  </div>
+                  <input placeholder={`Enter results for ${test}...`} value={results[test] || ''}
+                    onChange={e => setResults({ ...results, [test]: e.target.value })}
+                    className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-slate-300 focus:outline-none focus:border-medical-500 transition-all placeholder:text-slate-700" />
+                </div>
+              ))}
+            </div>
+
             <button onClick={submitResults} disabled={submitting}
-              className="w-full bg-cyan-700 text-white py-4 rounded-xl font-bold text-lg hover:bg-cyan-600 disabled:opacity-50 transition">
-              {submitting ? 'Submitting...' : 'SUBMIT RESULTS TO DOCTOR'}
+              className="w-full bg-medical-500 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-medical-400 disabled:opacity-50 transition-all shadow-xl shadow-medical-500/20 flex items-center justify-center gap-3">
+              {submitting ? 'Submitting Clinical Data...' : <><Send className="w-5 h-5" /> Submit to Physician Dashboard</>}
             </button>
           </div>
         )}
 
         {record && tests.length === 0 && (
-          <div className="text-center text-slate-400 py-12">No lab tests ordered for this patient</div>
+          <div className="medical-card h-48 border-dashed flex flex-col items-center justify-center text-slate-600 gap-4">
+            <FlaskConical className="w-8 h-8 opacity-20" />
+            <div className="text-sm font-medium">No diagnostic tests currently queued.</div>
+          </div>
         )}
 
         {done && (
-          <div className="text-center bg-green-50 border border-green-200 rounded-2xl p-10">
-            <div className="text-5xl mb-3">✅</div>
-            <div className="text-green-800 font-bold text-xl">Results submitted!</div>
-            <div className="text-green-600 text-sm mt-1">Doctor dashboard updated live</div>
-            <div className="mt-4 text-xs text-slate-400 space-y-1">
-              {Object.entries(results).map(([k, v]) => <div key={k}>{k}: <strong>{v}</strong></div>)}
+          <div className="medical-card text-center py-16 animate-in zoom-in-95 duration-500 border-green-500/30 bg-green-500/5">
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-10 h-10 text-green-500" />
+            </div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Diagnostics Updated</h2>
+            <p className="text-slate-400 text-sm mt-2">Data successfully transmitted to Doctor Dashboard</p>
+            <div className="mt-8 flex flex-col items-center gap-2">
+              {Object.entries(results).map(([k, v]) => (
+                <div key={k} className="text-xs font-medium text-slate-500 flex gap-2">
+                  <span>{k}:</span>
+                  <span className="text-green-400 font-bold">{v}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

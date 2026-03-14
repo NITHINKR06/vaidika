@@ -16,6 +16,7 @@ class ClinicalRecord(BaseModel):
 
 
 class PatientRegister(BaseModel):
+    patient_id: Optional[str] = None
     name: str
     age: int
     gender: str

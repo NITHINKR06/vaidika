@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { speakB64 } from '@/lib/api'
 import { unlockAudio, playBase64 } from '@/lib/audioPlayer'
+import { Volume2, Loader2, AlertCircle } from 'lucide-react'
 
 /**
  * Reusable TTS Speak Button.
@@ -13,18 +14,14 @@ export default function SpeakButton({ text, language, label, className = '', siz
     const handleSpeak = async () => {
         if (!text || loading) return
 
-        // 1. Immediately "unlock" the audio context during the user gesture
         unlockAudio();
-
         setLoading(true)
         setError(false)
 
         try {
-            // 2. Fetch (this delay is now safe because we unlocked the audio engine above)
             const result = await speakB64(text, language)
             if (!result.audio_b64) throw new Error('Empty audio_b64')
 
-            // 3. Play using the persistent manager
             console.log(`[SpeakButton] Fetch done, starting playback...`)
             await playBase64(result.audio_b64)
             console.log('✅ [SpeakButton] Play success')
@@ -40,19 +37,27 @@ export default function SpeakButton({ text, language, label, className = '', siz
         }
     }
 
-    const sizeClasses = size === 'md' ? 'px-4 py-2 text-sm' : 'px-2 py-1 text-xs'
-
     return (
         <button
             onClick={handleSpeak}
             disabled={loading || !text}
-            className={`inline-flex items-center gap-1 rounded-lg font-medium transition
-        ${error ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'}
-        disabled:opacity-40 ${sizeClasses} ${className}`}
+            title={label || 'Listen to speech'}
+            className={`
+                inline-flex items-center gap-2 font-bold uppercase tracking-widest transition-all duration-300
+                ${size === 'md' ? 'px-4 py-2 text-[10px]' : 'px-3 py-1.5 text-[9px]'}
+                ${error
+                    ? 'bg-red-500/20 text-red-500 border border-red-500/30'
+                    : 'bg-medical-500/10 text-medical-400 border border-medical-500/20 hover:bg-medical-500 hover:text-white hover:border-medical-500'}
+                rounded-xl disabled:opacity-40 shadow-sm
+            `}
         >
             {loading ? (
-                <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-            ) : error ? '❌' : '🔊'}
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : error ? (
+                <AlertCircle className="w-3.5 h-3.5" />
+            ) : (
+                <Volume2 className="w-3.5 h-3.5" />
+            )}
             {label && <span>{label}</span>}
         </button>
     )

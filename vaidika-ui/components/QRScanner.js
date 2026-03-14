@@ -4,9 +4,11 @@
 import { useEffect, useRef, useState } from 'react'
 
 export default function QRScanner({ onScan, onClose }) {
-  const divRef    = useRef(null)
+  const divRef = useRef(null)
   const scannerRef = useRef(null)
   const [error, setError] = useState('')
+
+  const hasScanned = useRef(false)
 
   useEffect(() => {
     let scanner
@@ -19,6 +21,9 @@ export default function QRScanner({ onScan, onClose }) {
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
+            if (hasScanned.current) return
+            hasScanned.current = true
+
             // Try to parse JSON payload, fallback to raw string as patient_id
             try {
               const data = JSON.parse(decodedText)
@@ -27,7 +32,7 @@ export default function QRScanner({ onScan, onClose }) {
               onScan(decodedText)
             }
           },
-          () => {}   // ignore per-frame errors
+          () => { }   // ignore per-frame errors
         )
       } catch (e) {
         setError('Camera not available. Enter Patient ID manually.')
@@ -38,7 +43,7 @@ export default function QRScanner({ onScan, onClose }) {
       if (scannerRef.current) {
         scannerRef.current.stop().then(() => {
           scannerRef.current.clear()
-        }).catch(() => {})
+        }).catch(() => { })
       }
     }
   }, [onScan])

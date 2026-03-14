@@ -1,25 +1,25 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
 import { getFullRecord, updateDepartment } from '@/lib/api'
 
 export default function LabPortal() {
-  const [record, setRecord]     = useState(null)
+  const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
-  const [results, setResults]   = useState({})
-  const [done, setDone]         = useState(false)
-  const [loading, setLoading]   = useState(false)
+  const [results, setResults] = useState({})
+  const [done, setDone] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [submitting, setSubmit] = useState(false)
-  const [error, setError]       = useState('')
+  const [error, setError] = useState('')
 
-  const loadPatient = async (id) => {
+  const loadPatient = useCallback(async (id) => {
     setPatientId(id); setLoading(true); setError('')
     setRecord(null); setDone(false); setResults({})
     try { setRecord(await getFullRecord(id)) }
     catch (e) { setError(e.message) }
     setLoading(false)
-  }
+  }, [])
 
   const submitResults = async () => {
     const tests = record?.consultation?.lab_tests || []
@@ -31,7 +31,7 @@ export default function LabPortal() {
     setSubmit(false)
   }
 
-  const tests    = record?.consultation?.lab_tests || []
+  const tests = record?.consultation?.lab_tests || []
   const severity = record?.consultation?.severity
 
   return (
@@ -51,9 +51,8 @@ export default function LabPortal() {
               <div className="text-slate-500 text-sm">Age {record.patient.age} · {record.patient.patient_id}</div>
             </div>
             {severity && (
-              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
-                severity==='emergency'?'bg-red-100 text-red-700':
-                severity==='high'?'bg-orange-100 text-orange-700':'bg-slate-100 text-slate-600'}`}>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
+                  severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
                 {severity}
               </span>
             )}
@@ -72,12 +71,12 @@ export default function LabPortal() {
             {tests.map(test => (
               <div key={test} className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-cyan-400 rounded-full"/>
+                  <span className="w-2 h-2 bg-cyan-400 rounded-full" />
                   {test}
                 </div>
-                <input placeholder={`Result for ${test}`} value={results[test]||''}
-                  onChange={e => setResults({...results,[test]:e.target.value})}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400"/>
+                <input placeholder={`Result for ${test}`} value={results[test] || ''}
+                  onChange={e => setResults({ ...results, [test]: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400" />
               </div>
             ))}
             <button onClick={submitResults} disabled={submitting}
@@ -97,7 +96,7 @@ export default function LabPortal() {
             <div className="text-green-800 font-bold text-xl">Results submitted!</div>
             <div className="text-green-600 text-sm mt-1">Doctor dashboard updated live</div>
             <div className="mt-4 text-xs text-slate-400 space-y-1">
-              {Object.entries(results).map(([k,v]) => <div key={k}>{k}: <strong>{v}</strong></div>)}
+              {Object.entries(results).map(([k, v]) => <div key={k}>{k}: <strong>{v}</strong></div>)}
             </div>
           </div>
         )}

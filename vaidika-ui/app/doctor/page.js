@@ -93,7 +93,7 @@ export default function DoctorDashboard() {
   const patLang = record?.patient?.language || 'hi-IN'
   const langName = LANG_NAMES[patLang] || patLang
 
-  const loadPatient = async (id) => {
+  const loadPatient = useCallback(async (id) => {
     setPatientId(id)
     setLoadingPt(true); setError('')
     setRecord(null); setClinical(null); setConversation([]); setDischarge(null)
@@ -101,7 +101,7 @@ export default function DoctorDashboard() {
     try { setRecord(await getFullRecord(id)) }
     catch (e) { setError(e.message) }
     setLoadingPt(false)
-  }
+  }, [])
 
   // Patient speaks → transcribe in patient lang → translate to English for doctor
   const handlePatientSpeech = useCallback(async (blob) => {
@@ -112,10 +112,12 @@ export default function DoctorDashboard() {
       translated: result.english,        // English for doctor
       audioB64: null,
     }
-    const updated = [...conversation, turn]
-    setConversation(updated)
-    transcriptRef.current = updated
-  }, [patLang, conversation])
+    setConversation(prev => {
+      const updated = [...prev, turn]
+      transcriptRef.current = updated
+      return updated
+    })
+  }, [patLang])
 
   // Doctor speaks → transcribe English → translate to patient lang → play audio to patient
   const handleDoctorSpeech = useCallback(async (blob) => {
@@ -128,10 +130,12 @@ export default function DoctorDashboard() {
       translated: result.translated,         // what patient hears
       audioB64: result.audio_b64,
     }
-    const updated = [...conversation, turn]
-    setConversation(updated)
-    transcriptRef.current = updated
-  }, [patLang, conversation])
+    setConversation(prev => {
+      const updated = [...prev, turn]
+      transcriptRef.current = updated
+      return updated
+    })
+  }, [patLang])
 
   // Build full transcript from conversation turns and send to AI
   const handleConfirm = async () => {

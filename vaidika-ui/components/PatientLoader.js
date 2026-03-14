@@ -1,7 +1,7 @@
 // components/PatientLoader.js
 // Reusable bar: text input + QR scan button → calls onLoad(patientId)
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import QRScanner from './QRScanner'
 
 export default function PatientLoader({ onLoad, loading, accentColor = 'teal' }) {
@@ -15,14 +15,17 @@ export default function PatientLoader({ onLoad, loading, accentColor = 'teal' })
   }
   const c = colors[accentColor] || colors.teal
 
-  const handleLoad = () => { if (patientId.trim()) onLoad(patientId.trim()) }
-  const handleScan = (scannedId) => {
+  const handleLoad = useCallback(() => {
+    if (patientId.trim()) onLoad(patientId.trim())
+  }, [patientId, onLoad])
+
+  const handleScan = useCallback((scannedId) => {
     setPatientId(scannedId)
     setTimeout(() => {
       setScanning(false)
       onLoad(scannedId)
     }, 500)
-  }
+  }, [onLoad])
 
   return (
     <>

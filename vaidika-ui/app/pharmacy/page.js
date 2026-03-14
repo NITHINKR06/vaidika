@@ -1,24 +1,24 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
 import { getFullRecord, updateDepartment } from '@/lib/api'
 
 export default function PharmacyPortal() {
-  const [record, setRecord]       = useState(null)
+  const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
-  const [done, setDone]           = useState(false)
-  const [loading, setLoading]     = useState(false)
+  const [done, setDone] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [dispensing, setDispensing] = useState(false)
-  const [error, setError]         = useState('')
+  const [error, setError] = useState('')
 
-  const loadPatient = async (id) => {
+  const loadPatient = useCallback(async (id) => {
     setPatientId(id); setLoading(true); setError('')
     setRecord(null); setDone(false)
     try { setRecord(await getFullRecord(id)) }
     catch (e) { setError(e.message) }
     setLoading(false)
-  }
+  }, [])
 
   const markDispensed = async () => {
     setDispensing(true); setError('')
@@ -32,8 +32,8 @@ export default function PharmacyPortal() {
     setDispensing(false)
   }
 
-  const meds      = record?.consultation?.prescriptions || []
-  const severity  = record?.consultation?.severity
+  const meds = record?.consultation?.prescriptions || []
+  const severity = record?.consultation?.severity
   const alreadyDone = record?.pharmacy_status?.status === 'dispensed'
 
   return (
@@ -58,9 +58,8 @@ export default function PharmacyPortal() {
               )}
             </div>
             {severity && (
-              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
-                severity==='emergency'?'bg-red-100 text-red-700':
-                severity==='high'?'bg-orange-100 text-orange-700':'bg-slate-100 text-slate-600'}`}>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${severity === 'emergency' ? 'bg-red-100 text-red-700' :
+                  severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
                 {severity}
               </span>
             )}
@@ -80,7 +79,7 @@ export default function PharmacyPortal() {
               {meds.map((med, i) => (
                 <div key={i} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 font-bold text-sm shrink-0">
-                    {i+1}
+                    {i + 1}
                   </div>
                   <div className="font-semibold text-slate-800">{med}</div>
                 </div>
@@ -103,7 +102,7 @@ export default function PharmacyPortal() {
             <div className="text-green-800 font-bold text-xl">All medicines dispensed!</div>
             <div className="text-green-600 text-sm mt-2">Patient is cleared to leave</div>
             <div className="mt-4 space-y-1">
-              {meds.map((m,i) => <div key={i} className="text-xs text-slate-500">✓ {m}</div>)}
+              {meds.map((m, i) => <div key={i} className="text-xs text-slate-500">✓ {m}</div>)}
             </div>
           </div>
         )}

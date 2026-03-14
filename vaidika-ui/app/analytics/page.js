@@ -15,7 +15,8 @@ import {
   ArrowLeft,
   PieChart,
   User,
-  Languages
+  Languages,
+  History
 } from 'lucide-react'
 
 const LANG_NAMES = {

@@ -29,7 +29,7 @@ services:
     name: vaidika-frontend
     runtime: docker
     dockerContext: vaidika-ui
-    dockerfilePath: Dockerfile
+    dockerfilePath: vaidika-ui/Dockerfile
     plan: free
     region: singapore
     envVars:

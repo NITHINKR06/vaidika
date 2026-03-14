@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+.env
+node_modules/
+.next/
+out/
+data/delta/
+airflow/logs/
+.DS_Store

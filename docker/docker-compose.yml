@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports: ['8000:8000']
+    volumes: ['..:/app']
+    env_file: ['../.env']
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD','curl','-f','http://localhost:8000/health']
+      interval: 30s
+      retries: 3
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes: ['../vaidika-ui:/app']
+    ports: ['3000:3000']
+    command: sh -c "npm install && npm run dev"
+    environment: ['NEXT_PUBLIC_API_URL=http://backend:8000']
+    depends_on: [backend]
+
+  airflow:
+    image: apache/airflow:2.9.0
+    ports: ['8080:8080']
+    volumes:
+      - ../pipelines:/opt/airflow/dags
+      - ../vaidika.db:/opt/airflow/vaidika.db
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    command: standalone
+    restart: unless-stopped

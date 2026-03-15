@@ -25,9 +25,8 @@ const LANG_NAMES = {
 
 export default function LabPortal() {
   const router = useRouter()
-  const { auth } = useApp()
+  const { auth, hospital } = useApp()
   const { ready } = useRoleGuard('lab_tech', 'hospital_admin')
-  if (!ready) return null
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [results, setResults] = useState({})
@@ -37,10 +36,12 @@ export default function LabPortal() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!auth || auth.role !== 'lab_tech') {
+    if (ready && !auth) {
       router.push('/auth')
     }
-  }, [hospital, router])
+  }, [auth, ready, router])
+
+  if (!ready) return null
 
   const loadPatient = useCallback(async (id) => {
     setPatientId(id); setLoading(true); setError('')

@@ -34,9 +34,9 @@ const LANGUAGES = [
 
 export default function ReceptionPage() {
   const router = useRouter()
-  const { auth } = useApp()
+  const { auth, hospital } = useApp()
   const { ready } = useRoleGuard('receptionist', 'hospital_admin')
-  if (!ready) return null
+
   const [mode, setMode] = useState('new') // 'new' or 'returning'
   const [form, setForm] = useState({ name: '', age: '', gender: 'Male', language: 'hi-IN', aadhaar_last4: '' })
   const [searchId, setSearchId] = useState('')

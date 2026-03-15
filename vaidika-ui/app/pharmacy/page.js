@@ -13,6 +13,7 @@ const LANG_NAMES = {
 }
 
 export default function PharmacyPortal() {
+  const { auth, hospital } = useApp()
   const { ready } = useRoleGuard('lab_tech', 'hospital_admin')
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')

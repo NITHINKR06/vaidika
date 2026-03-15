@@ -101,9 +101,8 @@ function VoiceTurn({ label, icon, onResult, buttonText, processingText }) {
 // ── Main Doctor Dashboard ─────────────────────────────────────────
 export default function DoctorDashboard() {
   const router = useRouter()
-  const { hospital, doctor: currentDoc } = useApp()
+  const { auth, hospital, doctor: currentDoc } = useApp()
   const { ready } = useRoleGuard('doctor')
-  if (!ready) return null
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [loadingPt, setLoadingPt] = useState(false)
@@ -115,10 +114,12 @@ export default function DoctorDashboard() {
   const transcriptRef = useRef([])
 
   useEffect(() => {
-    if (!hospital || !currentDoc) {
+    if (ready && (!hospital || !currentDoc)) {
       router.push('/auth')
     }
-  }, [hospital, currentDoc, router])
+  }, [hospital, currentDoc, ready, router])
+
+  if (!ready) return null
 
   const patLang = record?.patient?.language || 'hi-IN'
   const langName = LANG_NAMES[patLang] || patLang

@@ -62,17 +62,10 @@ function BarChart({ data, colorClass = 'bg-medical-500' }) {
 
 export default function Analytics() {
   const router = useRouter()
-  const { auth } = useApp()
+  const { auth, hospital } = useApp()
   const { ready } = useRoleGuard('hospital_admin')
-  if (!ready) return null
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!auth || auth.role !== 'hospital_admin') {
-      router.push('/auth')
-    }
-  }, [hospital, router])
 
   const load = async () => {
     setLoading(true)
@@ -80,9 +73,17 @@ export default function Analytics() {
     setLoading(false)
   }
 
-  useEffect(() => { if (hospital) load() }, [hospital])
+  useEffect(() => {
+    if (ready && !auth) {
+      router.push('/auth')
+    }
+  }, [auth, ready, router])
 
-  if (!auth) return null
+  useEffect(() => {
+    if (ready && hospital) load()
+  }, [hospital, ready])
+
+  if (!ready) return null
 
   if (loading) return (
     <div className="min-h-screen bg-medical-gradient flex flex-col items-center justify-center gap-4">

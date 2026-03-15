@@ -6,6 +6,7 @@ import PatientLoader from '@/components/PatientLoader'
 import SpeakButton from '@/components/SpeakButton'
 import { getFullRecord, updateDepartment } from '@/lib/api'
 import { useApp } from '@/lib/AppContext'
+import { useRoleGuard } from '@/lib/useRoleGuard'
 import {
   Microscope,
   FlaskConical,
@@ -24,7 +25,9 @@ const LANG_NAMES = {
 
 export default function LabPortal() {
   const router = useRouter()
-  const { hospital } = useApp()
+  const { auth } = useApp()
+  const { ready } = useRoleGuard('lab_tech', 'hospital_admin')
+  if (!ready) return null
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [results, setResults] = useState({})
@@ -34,7 +37,7 @@ export default function LabPortal() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!hospital) {
+    if (!auth || auth.role !== 'lab_tech') {
       router.push('/auth')
     }
   }, [hospital, router])
@@ -62,7 +65,7 @@ export default function LabPortal() {
   const langName = LANG_NAMES[patLang] || patLang
   const severity = record?.consultation?.severity
 
-  if (!hospital) return null
+  if (!auth) return null
 
   return (
     <div className="min-h-screen bg-medical-gradient p-6">

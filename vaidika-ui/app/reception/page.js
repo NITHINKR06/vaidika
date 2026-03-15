@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { registerPatient, getFullRecord } from '@/lib/api'
 import { useApp } from '@/lib/AppContext'
+import { useRoleGuard } from '@/lib/useRoleGuard'
 import QRScanner from '@/components/QRScanner'
 import {
   UserPlus,
@@ -33,7 +34,9 @@ const LANGUAGES = [
 
 export default function ReceptionPage() {
   const router = useRouter()
-  const { hospital } = useApp()
+  const { auth } = useApp()
+  const { ready } = useRoleGuard('receptionist', 'hospital_admin')
+  if (!ready) return null
   const [mode, setMode] = useState('new') // 'new' or 'returning'
   const [form, setForm] = useState({ name: '', age: '', gender: 'Male', language: 'hi-IN', aadhaar_last4: '' })
   const [searchId, setSearchId] = useState('')
@@ -46,7 +49,7 @@ export default function ReceptionPage() {
   const printRef = useRef()
 
   useEffect(() => {
-    if (!hospital) {
+    if (!auth || auth.role !== 'receptionist') {
       router.push('/auth')
     }
   }, [hospital, router])
@@ -128,7 +131,7 @@ export default function ReceptionPage() {
     w.print()
   }
 
-  if (!hospital) return null
+  if (!auth) return null
 
   if (result) return (
     <div className="min-h-screen bg-medical-gradient flex items-center justify-center p-6">

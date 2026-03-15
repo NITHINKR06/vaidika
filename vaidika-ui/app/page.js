@@ -26,18 +26,19 @@ const PORTALS = [
 
 export default function Home() {
   const router = useRouter()
-  const { hospital, hospitalLoggedIn } = useApp()
+  const { auth } = useApp()
   const [status, setStatus] = useState(null)
 
   useEffect(() => {
-    if (!hospitalLoggedIn) {
-      router.push('/auth')
-      return
-    }
+    if (!auth) { router.push('/auth'); return }
+    if (auth.role === 'doctor') { router.push('/doctor'); return }
+    if (auth.role === 'receptionist') { router.push('/reception'); return }
+    if (auth.role === 'lab_tech') { router.push('/lab'); return }
+    if (auth.role === 'system_admin') { router.push('/sysadmin'); return }
     healthCheck().then(setStatus).catch(() => setStatus({ api: 'offline' }))
-  }, [hospitalLoggedIn, router])
+  }, [auth, router])
 
-  if (!hospitalLoggedIn) return <div className="min-h-screen bg-[#020b18]" />
+  if (!auth) return <div className="min-h-screen bg-[#020b18]" />
 
   return (
     <main className="min-h-screen bg-[#020b18] text-slate-200 p-8 lg:p-16 relative overflow-hidden font-sans">
@@ -56,7 +57,7 @@ export default function Home() {
               Hospital <span className="text-cyan-400">Dashboard</span>
             </h1>
             <p className="text-slate-400 text-lg">
-              Welcome to <span className="text-white font-bold">{hospital?.name}</span>. Efficiency at every touchpoint.
+              Welcome to <span className="text-white font-bold">{auth?.name}</span>. Efficiency at every touchpoint.
             </p>
           </div>
 
@@ -94,7 +95,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="mt-32 pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-600 text-[10px] font-mono tracking-[0.2em] uppercase">
-          <div>VAIDIKAAI V3.0.0 // {hospital?.id || 'H1'}</div>
+          <div>VAIDIKAAI V3.0.0 // {auth?.hospital_id || 'SYSTEM'}</div>
           <div>© 2025 PROTOTHON CLINICAL</div>
         </footer>
       </div>

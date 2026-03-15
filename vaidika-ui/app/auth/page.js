@@ -2,94 +2,92 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '@/lib/AppContext'
-import { Building2, UserCircle2, ArrowRight, ShieldCheck, Activity, Lock, Mail, Key } from 'lucide-react'
-
-const MOCK_HOSPITALS = [
-    { id: 'h1', name: 'KMC Hospital, Mangalore', location: 'Hampankatta', color: 'blue' },
-    { id: 'h2', name: 'Father Muller Medical College Hospital', location: 'Kankanady', color: 'teal' },
-    { id: 'h3', name: 'AJ Hospital & Research Centre', location: 'Kuntikan', color: 'indigo' },
-]
-
-const MOCK_DOCTORS = [
-    { id: 'd1', hospitalId: 'h1', name: 'Vishweshwara Bhat', speciality: 'Neuro Surgeon' },
-    { id: 'd2', hospitalId: 'h1', name: 'Anitha Rao', speciality: 'Cardiologist' },
-    { id: 'd3', hospitalId: 'h2', name: 'Santhosh Kumar', speciality: 'General Physician' },
-    { id: 'd4', hospitalId: 'h2', name: 'Rashmi Shetty', speciality: 'Pediatrician' },
-    { id: 'd5', hospitalId: 'h3', name: 'Prasad Hegde', speciality: 'Orthopedic Surgeon' },
-]
+import { staffLogin, hospitalLogin, systemLogin, hospitalApply } from '@/lib/api'
+import { Activity, ArrowRight, Lock, Mail, Key, Building2, User, ShieldCheck, ChevronLeft, PlusCircle } from 'lucide-react'
 
 export default function AuthPage() {
     const router = useRouter()
-    const { selectHospital, selectDoctor, hospital: selectedHospital, doctor: selectedDoctor } = useApp()
-
-    // Steps: 1: Hospital Select, 2: Hospital Login, 3: Doctor Select, 4: Doctor Login
-    const [step, setStep] = useState(1)
-    const [tempHospital, setTempHospital] = useState(null)
-    const [tempDoctor, setTempDoctor] = useState(null)
-
-    // Form States
-    const [email, setEmail] = useState('admin@hospital.com')
-    const [password, setPassword] = useState('hospital123')
-    const [pin, setPin] = useState('1234')
+    const { auth, login } = useApp()
+    const [mode, setMode] = useState('staff') // 'staff' | 'hospital_admin' | 'system_admin' | 'apply'
+    const [form, setForm] = useState({})
     const [error, setError] = useState('')
+    const [success, setSuccess] = useState('')
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        if (selectedHospital && !selectedDoctor) setStep(3)
-        if (selectedHospital && selectedDoctor) router.push('/')
-    }, [selectedHospital, selectedDoctor, router])
+        if (auth) redirectByRole(auth.role, router)
+    }, [auth, router])
 
-    const handleHospitalSelect = (h) => {
-        setTempHospital(h)
-        setStep(2)
-        setError('')
-    }
+    const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-    const handleHospitalLogin = (e) => {
+    const handleStaffLogin = async (e) => {
         e.preventDefault()
-        setLoading(true)
-        setTimeout(() => {
-            if (email === 'admin@hospital.com' && password === 'hospital123') {
-                selectHospital(tempHospital)
-                setStep(3)
+        setError(''); setLoading(true)
+        try {
+            const res = await staffLogin(form.username, form.password, form.hospital_id)
+            if (res.api_key) {
+                login({ api_key: res.api_key, role: res.role, hospital_id: res.hospital_id, name: res.name })
+                redirectByRole(res.role, router)
             } else {
-                setError('Invalid hospital credentials')
+                setError(res.detail || 'Login failed')
             }
-            setLoading(false)
-        }, 800)
+        } catch (e) { setError(e.message) }
+        setLoading(false)
     }
 
-    const handleDoctorSelect = (d) => {
-        setTempDoctor(d)
-        setStep(4)
-        setError('')
-    }
-
-    const handleDoctorLogin = (e) => {
+    const handleHospitalLogin = async (e) => {
         e.preventDefault()
-        setLoading(true)
-        setTimeout(() => {
-            if (pin === '1234') {
-                selectDoctor(tempDoctor)
-                router.push('/')
+        setError(''); setLoading(true)
+        try {
+            const res = await hospitalLogin(form.admin_email, form.password)
+            if (res.api_key) {
+                login({ api_key: res.api_key, role: 'hospital_admin', hospital_id: res.hospital_id, name: res.hospital_name })
+                router.push('/admin')
             } else {
-                setError('Invalid secure PIN')
+                setError(res.detail || 'Login failed')
             }
-            setLoading(false)
-        }, 800)
+        } catch (e) { setError(e.message) }
+        setLoading(false)
+    }
+
+    const handleSystemLogin = async (e) => {
+        e.preventDefault()
+        setError(''); setLoading(true)
+        try {
+            const res = await systemLogin(form.username, form.password)
+            if (res.api_key) {
+                login({ api_key: res.api_key, role: 'system_admin', name: 'System Admin' })
+                router.push('/sysadmin')
+            } else {
+                setError(res.detail || 'Login failed')
+            }
+        } catch (e) { setError(e.message) }
+        setLoading(false)
+    }
+
+    const handleApply = async (e) => {
+        e.preventDefault()
+        setError(''); setSuccess(''); setLoading(true)
+        try {
+            const res = await hospitalApply(form)
+            if (res.hospital_id) {
+                setSuccess(`Application submitted! Your Hospital ID is ${res.hospital_id}. Await system admin approval.`)
+                setForm({})
+            } else {
+                setError(res.detail || 'Submission failed')
+            }
+        } catch (e) { setError(e.message) }
+        setLoading(false)
     }
 
     return (
-        <div className="min-h-screen bg-medical-gradient flex items-center justify-center p-6 lg:p-12 relative overflow-hidden">
-            {/* Background Decorations */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-medical-500/10 blur-[120px] rounded-full" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
-            </div>
+        <div className="min-h-screen bg-[#020b18] flex items-center justify-center p-6 relative overflow-hidden">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-medical-500/10 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
 
             <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-16 items-center relative z-10">
-                {/* Left Side: Branding */}
-                <div className="text-white space-y-8 animate-in slide-in-from-left-8 duration-700">
+                {/* Branding */}
+                <div className="text-white space-y-8">
                     <div className="space-y-4">
                         <div className="w-16 h-16 bg-medical-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-medical-500/30">
                             <Activity className="w-9 h-9" />
@@ -97,153 +95,113 @@ export default function AuthPage() {
                         <h1 className="text-5xl font-black tracking-tight leading-none">
                             Vaidika<span className="text-medical-400">AI</span>
                         </h1>
-                        <p className="text-xl font-medium text-slate-300">Unified Clinical Intelligence Network</p>
+                        <p className="text-xl font-medium text-slate-300">Multi-Hospital Clinical Platform</p>
                     </div>
-
-                    <div className="space-y-6">
-                        <div className="p-6 medical-card border-white/5 bg-slate-900/40 backdrop-blur-xl">
-                            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-                                <ShieldCheck className="w-5 h-5 text-medical-400" /> Multi-Hospital Protocol
-                            </h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">
-                                Access patient records seamlessly across our cloud-mesh network. Identification via Bio-ID or QR Linkage.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-col gap-4 pl-4">
-                            <Feature icon={<Lock className="w-4 h-4 text-medical-400" />} text="Military-grade Patient Privacy" />
-                            <Feature icon={<Activity className="w-4 h-4 text-medical-400" />} text="Real-time Neural Consultation" />
-                        </div>
+                    {/* Mode selector tabs */}
+                    <div className="space-y-2">
+                        {[
+                            { key: 'staff', icon: <User className="w-4 h-4" />, label: 'Staff login', sub: 'Doctor, receptionist, lab tech' },
+                            { key: 'hospital_admin', icon: <Building2 className="w-4 h-4" />, label: 'Hospital admin login', sub: 'Manage your hospital staff' },
+                            { key: 'system_admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'System admin login', sub: 'Platform owner access' },
+                            { key: 'apply', icon: <PlusCircle className="w-4 h-4" />, label: 'Register your hospital', sub: 'Apply to use VaidikaAI' },
+                        ].map(m => (
+                            <button key={m.key} onClick={() => { setMode(m.key); setError(''); setSuccess('') }}
+                                className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all text-left
+                                    ${mode === m.key ? 'bg-medical-500/10 border-medical-500/40 text-white' : 'border-white/5 text-slate-400 hover:border-white/10 hover:text-slate-300'}`}>
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${mode === m.key ? 'bg-medical-500' : 'bg-slate-800'}`}>{m.icon}</div>
+                                <div>
+                                    <div className="font-semibold text-sm">{m.label}</div>
+                                    <div className="text-xs text-slate-500">{m.sub}</div>
+                                </div>
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                {/* Right Side: Step-based Auth */}
-                <div className="glass-card rounded-[3rem] p-10 md:p-12 border-white/10 shadow-2xl animate-in slide-in-from-right-8 duration-700">
-                    {/* Progress Indicator */}
-                    <div className="flex gap-2 mb-8 items-center">
-                        {[1, 2, 3, 4].map(s => (
-                            <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${step >= s ? 'w-8 bg-medical-500' : 'w-4 bg-slate-800'}`} />
-                        ))}
-                        <span className="ml-4 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Step {step}/4</span>
-                    </div>
+                {/* Form panel */}
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-10 shadow-2xl">
+                    {error && <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+                    {success && <div className="mb-6 p-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm">{success}</div>}
 
-                    {error && (
-                        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs mb-8 animate-in shake-1 duration-300">
-                            {error}
-                        </div>
-                    )}
-
-                    {step === 1 && (
-                        <div className="space-y-6 animate-in fade-in transition-all">
-                            <div>
-                                <h3 className="text-2xl font-bold text-white mb-2">Hospital Network</h3>
-                                <p className="text-slate-400 text-sm">Select your medical facility from Mangalore cluster.</p>
-                            </div>
-                            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                                {MOCK_HOSPITALS.map((h) => (
-                                    <button key={h.id} onClick={() => handleHospitalSelect(h)} className="w-full medical-card group hover:border-medical-500/40 flex items-center justify-between p-5">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:bg-medical-500/20 transition-all">
-                                                <Building2 className="w-6 h-6 text-medical-400" />
-                                            </div>
-                                            <div className="text-left">
-                                                <div className="font-bold text-slate-200">{h.name}</div>
-                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest">{h.location}</div>
-                                            </div>
-                                        </div>
-                                        <ArrowRight className="w-5 h-5 text-slate-700 group-hover:text-medical-400 group-hover:translate-x-1 transition-all" />
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {step === 2 && (
-                        <form onSubmit={handleHospitalLogin} className="space-y-6 animate-in slide-in-from-right-4 transition-all">
-                            <button onClick={() => setStep(1)} className="text-[10px] font-black text-medical-400 hover:text-medical-300 uppercase tracking-widest flex items-center gap-2 mb-4 transition-colors">
-                                ← Back to Network
-                            </button>
-                            <div>
-                                <h3 className="text-2xl font-bold text-white mb-2">Hospital Login</h3>
-                                <p className="text-slate-400 text-sm">Sign in to <span className="text-medical-400 font-bold">{tempHospital?.name}</span></p>
-                            </div>
-                            <div className="space-y-4">
-                                <AuthInput label="Institutional Email" type="email" value={email} onChange={e => setEmail(e.target.value)} icon={<Mail className="w-4 h-4" />} />
-                                <AuthInput label="Portal Password" type="password" value={password} onChange={e => setPassword(e.target.value)} icon={<Key className="w-4 h-4" />} />
-                            </div>
-                            <button type="submit" disabled={loading} className="w-full bg-medical-500 hover:bg-medical-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-medical-500/20 transition-all flex items-center justify-center gap-3">
-                                {loading ? 'Authorizing...' : <>Secure Access <ArrowRight className="w-4 h-4" /></>}
-                            </button>
+                    {mode === 'staff' && (
+                        <form onSubmit={handleStaffLogin} className="space-y-5">
+                            <h3 className="text-2xl font-bold text-white mb-6">Staff login</h3>
+                            <AuthInput label="Hospital ID" placeholder="HOSP-XXXXXXXX" value={form.hospital_id || ''} onChange={set('hospital_id')} icon={<Building2 className="w-4 h-4" />} required />
+                            <AuthInput label="Username" placeholder="drpriya" value={form.username || ''} onChange={set('username')} icon={<User className="w-4 h-4" />} required />
+                            <AuthInput label="Password" type="password" value={form.password || ''} onChange={set('password')} icon={<Lock className="w-4 h-4" />} required />
+                            <SubmitBtn loading={loading} label="Login" />
                         </form>
                     )}
 
-                    {step === 3 && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4 transition-all">
-                            <div>
-                                <h3 className="text-2xl font-bold text-white mb-2">Select Physician</h3>
-                                <p className="text-slate-400 text-sm">Choose the active doctor for this session.</p>
-                            </div>
-                            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                                {MOCK_DOCTORS.filter(d => d.hospitalId === selectedHospital?.id).map((d) => (
-                                    <button key={d.id} onClick={() => handleDoctorSelect(d)} className="w-full medical-card group hover:border-medical-500/40 flex items-center justify-between p-5">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:bg-medical-500/20 transition-all">
-                                                <UserCircle2 className="w-6 h-6 text-medical-400" />
-                                            </div>
-                                            <div className="text-left">
-                                                <div className="font-bold text-slate-200">Dr. {d.name}</div>
-                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest">{d.speciality}</div>
-                                            </div>
-                                        </div>
-                                        <ArrowRight className="w-5 h-5 text-slate-700 group-hover:text-medical-400 group-hover:translate-x-1 transition-all" />
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                    {mode === 'hospital_admin' && (
+                        <form onSubmit={handleHospitalLogin} className="space-y-5">
+                            <h3 className="text-2xl font-bold text-white mb-6">Hospital admin login</h3>
+                            <AuthInput label="Admin email" type="email" placeholder="admin@yourhospital.com" value={form.admin_email || ''} onChange={set('admin_email')} icon={<Mail className="w-4 h-4" />} required />
+                            <AuthInput label="Password" type="password" value={form.password || ''} onChange={set('password')} icon={<Lock className="w-4 h-4" />} required />
+                            <SubmitBtn loading={loading} label="Login" />
+                        </form>
                     )}
 
-                    {step === 4 && (
-                        <form onSubmit={handleDoctorLogin} className="space-y-6 animate-in slide-in-from-right-4 transition-all">
-                            <button onClick={() => setStep(3)} className="text-[10px] font-black text-medical-400 hover:text-medical-300 uppercase tracking-widest flex items-center gap-2 mb-4 transition-colors">
-                                ← Back to Doctors
-                            </button>
-                            <div>
-                                <h3 className="text-2xl font-bold text-white mb-2">Secure Entry</h3>
-                                <p className="text-slate-400 text-sm">Dr. <span className="text-medical-400 font-bold">{tempDoctor?.name}</span>, please enter your PIN.</p>
+                    {mode === 'system_admin' && (
+                        <form onSubmit={handleSystemLogin} className="space-y-5">
+                            <h3 className="text-2xl font-bold text-white mb-6">System admin login</h3>
+                            <AuthInput label="Username" placeholder="sysadmin" value={form.username || ''} onChange={set('username')} icon={<User className="w-4 h-4" />} required />
+                            <AuthInput label="Password" type="password" value={form.password || ''} onChange={set('password')} icon={<Lock className="w-4 h-4" />} required />
+                            <SubmitBtn loading={loading} label="Login" />
+                        </form>
+                    )}
+
+                    {mode === 'apply' && (
+                        <form onSubmit={handleApply} className="space-y-4">
+                            <h3 className="text-2xl font-bold text-white mb-4">Register hospital</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2"><AuthInput label="Hospital name" value={form.name || ''} onChange={set('name')} required /></div>
+                                <AuthInput label="License number" value={form.license_number || ''} onChange={set('license_number')} required />
+                                <AuthInput label="Phone" value={form.phone || ''} onChange={set('phone')} required />
+                                <AuthInput label="Email" type="email" value={form.email || ''} onChange={set('email')} required />
+                                <AuthInput label="Pincode" value={form.pincode || ''} onChange={set('pincode')} required />
+                                <div className="col-span-2"><AuthInput label="Address" value={form.address || ''} onChange={set('address')} required /></div>
+                                <AuthInput label="City" value={form.city || ''} onChange={set('city')} required />
+                                <AuthInput label="State" value={form.state || ''} onChange={set('state')} required />
+                                <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
+                                    <p className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Admin account</p>
+                                </div>
+                                <div className="col-span-2"><AuthInput label="Admin name" value={form.admin_name || ''} onChange={set('admin_name')} required /></div>
+                                <AuthInput label="Admin email" type="email" value={form.admin_email || ''} onChange={set('admin_email')} required />
+                                <AuthInput label="Password" type="password" value={form.password || ''} onChange={set('password')} required />
                             </div>
-                            <AuthInput label="Personnel Pin" type="password" value={pin} onChange={e => setPin(e.target.value)} icon={<Lock className="w-4 h-4" />} maxLength={4} />
-                            <button type="submit" disabled={loading} className="w-full bg-medical-500 hover:bg-medical-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-medical-500/20 transition-all flex items-center justify-center gap-3">
-                                {loading ? 'Verifying...' : <>Enter Dashboard <ArrowRight className="w-4 h-4" /></>}
-                            </button>
+                            <SubmitBtn loading={loading} label="Submit application" />
                         </form>
                     )}
                 </div>
             </div>
         </div>
     )
+}
+
+function redirectByRole(role, router) {
+    if (role === 'system_admin') router.push('/sysadmin')
+    else if (role === 'hospital_admin') router.push('/admin')
+    else if (role === 'receptionist') router.push('/reception')
+    else if (role === 'doctor') router.push('/doctor')
+    else if (role === 'lab_tech') router.push('/lab')
+    else router.push('/')
 }
 
 function AuthInput({ label, icon, ...props }) {
     return (
-        <div className="space-y-2.5">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1 flex items-center gap-2">
-                {icon} {label}
-            </label>
-            <input
-                className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl px-5 py-3.5 text-slate-200 text-sm placeholder:text-slate-700 focus:border-medical-500/50 focus:outline-none transition-all"
-                {...props}
-            />
+        <div className="space-y-1.5">
+            {label && <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">{icon} {label}</label>}
+            <input className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 text-sm placeholder:text-slate-600 focus:border-medical-500/50 focus:outline-none transition-all" {...props} />
         </div>
     )
 }
 
-function Feature({ icon, text }) {
+function SubmitBtn({ loading, label }) {
     return (
-        <div className="flex items-center gap-3 text-[13px] font-medium text-slate-400">
-            <div className="w-7 h-7 rounded-lg bg-slate-800/50 flex items-center justify-center border border-white/5">
-                {icon}
-            </div>
-            <span>{text}</span>
-        </div>
+        <button type="submit" disabled={loading}
+            className="w-full mt-2 bg-medical-500 hover:bg-medical-400 disabled:opacity-50 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3">
+            {loading ? 'Please wait...' : <>{label} <ArrowRight className="w-4 h-4" /></>}
+        </button>
     )
 }

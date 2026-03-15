@@ -6,6 +6,7 @@ import PatientLoader from '@/components/PatientLoader'
 import SpeakButton from '@/components/SpeakButton'
 import { unlockAudio, playBase64 } from '@/lib/audioPlayer'
 import { useApp } from '@/lib/AppContext'
+import { useRoleGuard } from '@/lib/useRoleGuard'
 import {
   getFullRecord, saveConsultation, patientSpeech,
   doctorSpeech, translateText, getDischargeMessage, speakB64,
@@ -101,6 +102,8 @@ function VoiceTurn({ label, icon, onResult, buttonText, processingText }) {
 export default function DoctorDashboard() {
   const router = useRouter()
   const { hospital, doctor: currentDoc } = useApp()
+  const { ready } = useRoleGuard('doctor')
+  if (!ready) return null
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [loadingPt, setLoadingPt] = useState(false)

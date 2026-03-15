@@ -1,21 +1,11 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import PatientLoader from '@/components/PatientLoader'
 import SpeakButton from '@/components/SpeakButton'
 import { getFullRecord, updateDepartment } from '@/lib/api'
-import { useApp } from '@/lib/AppContext'
-import {
-  Pill,
-  CheckCircle2,
-  History,
-  AlertCircle,
-  ArrowLeft,
-  PackageCheck,
-  Languages,
-  User
-} from 'lucide-react'
+import { useRoleGuard } from '@/lib/useRoleGuard'
+import { Pill, CheckCircle2, AlertCircle, ArrowLeft, PackageCheck, Languages, User } from 'lucide-react'
 
 const LANG_NAMES = {
   'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu', 'kn-IN': 'Kannada',
@@ -23,20 +13,13 @@ const LANG_NAMES = {
 }
 
 export default function PharmacyPortal() {
-  const router = useRouter()
-  const { hospital } = useApp()
+  const { ready } = useRoleGuard('lab_tech', 'hospital_admin')
   const [record, setRecord] = useState(null)
   const [patientId, setPatientId] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
   const [dispensing, setDispensing] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!hospital) {
-      router.push('/auth')
-    }
-  }, [hospital, router])
 
   const loadPatient = useCallback(async (id) => {
     setPatientId(id); setLoading(true); setError('')
@@ -64,7 +47,7 @@ export default function PharmacyPortal() {
   const patLang = record?.patient?.language || 'hi-IN'
   const langName = LANG_NAMES[patLang] || patLang
 
-  if (!hospital) return null
+  if (!ready) return null
 
   return (
     <div className="min-h-screen bg-medical-gradient p-6">
@@ -119,7 +102,7 @@ export default function PharmacyPortal() {
 
         {alreadyDone && !done && (
           <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs flex gap-3 items-center">
-            <CheckCircle2 className="w-4 h-4" /> Prescription has already been dispensed.
+            <CheckCircle2 className="w-4 h-4" /> Prescription already dispensed.
           </div>
         )}
 
@@ -127,16 +110,10 @@ export default function PharmacyPortal() {
           <div className="space-y-4 pb-12">
             <div className="medical-card border-white/5 bg-slate-900/40">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Prescribed Medication</p>
-                <SpeakButton
-                  text={`You have been prescribed the following medicines: ${meds.join(', ')}`}
-                  language={patLang}
-                  label={`Explain in ${langName}`}
-                  size="sm"
-                />
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Prescribed medication</p>
+                <SpeakButton text={`You have been prescribed: ${meds.join(', ')}`} language={patLang} label={`Explain in ${langName}`} size="sm" />
               </div>
             </div>
-
             <div className="grid grid-cols-1 gap-3">
               {meds.map((med, i) => (
                 <div key={i} className="medical-card bg-slate-800/20 border-white/5 flex items-center gap-4 group hover:border-orange-500/30">
@@ -148,10 +125,9 @@ export default function PharmacyPortal() {
                 </div>
               ))}
             </div>
-
             <button onClick={markDispensed} disabled={dispensing}
               className="w-full bg-orange-500 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-orange-400 disabled:opacity-50 transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-3">
-              {dispensing ? 'Finalizing Dispensation...' : <><PackageCheck className="w-5 h-5" /> Mark All as Dispensed</>}
+              {dispensing ? 'Processing...' : <><PackageCheck className="w-5 h-5" /> Mark all as dispensed</>}
             </button>
           </div>
         )}
@@ -168,7 +144,7 @@ export default function PharmacyPortal() {
             <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-10 h-10 text-green-500" />
             </div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Prescription Filled</h2>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Prescription filled</h2>
             <p className="text-slate-400 text-sm mt-2">Inventory updated and patient cleared.</p>
             <div className="mt-8 space-y-2">
               {meds.map((m, i) => <div key={i} className="text-xs font-bold text-green-400 uppercase tracking-widest">✓ {m}</div>)}

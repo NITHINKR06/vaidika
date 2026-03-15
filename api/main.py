@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 
 from agents.schema import (
     PatientRegister, ConsultationRequest, DeptUpdateRequest,
-    TranslateRequest, TTSRequest
+    TranslateRequest, TTSRequest, LoginRequest, HospitalApply, ApplicationDecision
 )
+from fastapi.security import APIKeyHeader
+from fastapi import Depends
 from agents.consultation_agent import generate_clinical_record, check_llm_ready
 from voice.sarvam import (
     speech_to_text, translate, text_to_speech,
@@ -35,11 +37,158 @@ app.add_middleware(
 )
 
 
+# ── AUTH UTIL ───────────────────────────────────────────────────
+api_key_header = APIKeyHeader(name='X-API-Key', auto_error=False)
+
+def get_auth(api_key: str = Depends(api_key_header)):
+    if not api_key: return None
+    conn = get_db()
+    auth = conn.execute('SELECT * FROM api_keys WHERE key=?', (api_key,)).fetchone()
+    conn.close()
+    return dict(auth) if auth else None
+
+def require_auth(roles: list = None):
+    def dependency(auth = Depends(get_auth)):
+        if not auth: raise HTTPException(401, 'Valid API Key required')
+        if roles and auth['role'] not in roles:
+            raise HTTPException(403, f'Forbidden: requires {roles}')
+        return auth
+    return dependency
+
 @app.on_event('startup')
 def on_startup():
     init_db()
-    print('✅ DB ready')
+    # Seed System Admin from .env
+    user = os.getenv('SYSTEM_ADMIN_USERNAME', 'sysadmin')
+    pw   = os.getenv('SYSTEM_ADMIN_PASSWORD', 'VaidikaAdmin@2025')
+    print(f'✅ DB ready. System Admin: {user}')
     print('✅ LLM:', 'ready (Gemini/Ollama)' if check_llm_ready() else 'NOT READY — check GOOGLE_API_KEY or start Ollama')
+
+
+# ── AUTH ENDPOINTS ───────────────────────────────────────────────
+
+@app.post('/system/login')
+def system_login(req: LoginRequest):
+    admin_user = os.getenv('SYSTEM_ADMIN_USERNAME', 'sysadmin')
+    admin_pass = os.getenv('SYSTEM_ADMIN_PASSWORD', 'VaidikaAdmin@2025')
+    
+    if req.username == admin_user and req.password == admin_pass:
+        key = f'sk_sys_{uuid.uuid4().hex[:8]}'
+        conn = get_db()
+        conn.execute('INSERT INTO api_keys VALUES (?,?,?,?,?)',
+            (key, 'system', 'system_admin', datetime.datetime.now().isoformat(), None))
+        conn.commit(); conn.close()
+        return {'api_key': key, 'role': 'system_admin'}
+    raise HTTPException(401, 'Invalid system credentials')
+
+@app.post('/hospital/apply')
+def hospital_apply(req: HospitalApply):
+    app_id = f'APP-{uuid.uuid4().hex[:8].upper()}'
+    conn = get_db()
+    conn.execute('INSERT INTO applications VALUES (?,?,?,?,?)',
+        (app_id, req.json(), 'pending', '', datetime.datetime.now().isoformat()))
+    conn.commit(); conn.close()
+    return {'hospital_id': app_id, 'status': 'pending'}
+
+@app.post('/hospital/login')
+def hospital_login(req: LoginRequest):
+    conn = get_db()
+    h = conn.execute('SELECT * FROM hospitals WHERE email=? AND password=?', (req.email, req.password)).fetchone()
+    if not h:
+        conn.close()
+        raise HTTPException(401, 'Invalid hospital credentials')
+    key = f'sk_hosp_{uuid.uuid4().hex[:8]}'
+    conn.execute('INSERT INTO api_keys VALUES (?,?,?,?,?)',
+        (key, h['hospital_id'], 'hospital_admin', datetime.datetime.now().isoformat(), None))
+    conn.commit(); conn.close()
+    return {'api_key': key, 'role': 'hospital_admin', 'hospital_id': h['hospital_id'], 'hospital_name': h['name']}
+
+@app.post('/staff/login')
+def staff_login(req: LoginRequest):
+    conn = get_db()
+    s = conn.execute('SELECT * FROM staff WHERE username=? AND password=? AND hospital_id=?',
+        (req.username, req.password, req.hospital_id)).fetchone()
+    if not s:
+        conn.close()
+        raise HTTPException(401, 'Invalid staff credentials')
+    key = f'sk_staff_{uuid.uuid4().hex[:8]}'
+    conn.execute('INSERT INTO api_keys VALUES (?,?,?,?,?)',
+        (key, s['staff_id'], s['role'], datetime.datetime.now().isoformat(), None))
+    conn.commit(); conn.close()
+    return {'api_key': key, 'role': s['role'], 'hospital_id': req.hospital_id, 'name': s['name']}
+
+@app.post('/logout')
+def logout(auth = Depends(require_auth())):
+    conn = get_db()
+    conn.execute('DELETE FROM api_keys WHERE owner_id=?', (auth['owner_id'],))
+    conn.commit(); conn.close()
+    return {'status': 'logged_out'}
+
+
+# ── SYSTEM ADMIN ──────────────────────────────────────────────────
+@app.get('/system/applications')
+def get_apps(status: str = 'pending', auth = Depends(require_auth(['system_admin']))):
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM applications WHERE status=?', (status,)).fetchall()
+    conn.close()
+    res = []
+    for r in rows:
+        d = dict(r); d['data'] = json.loads(d['data'])
+        res.append(d)
+    return res
+
+@app.post('/system/applications/{app_id}')
+def decide_app(app_id: str, req: ApplicationDecision, auth = Depends(require_auth(['system_admin']))):
+    conn = get_db()
+    row = conn.execute('SELECT * FROM applications WHERE app_id=?', (app_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404, 'Application not found')
+    
+    conn.execute('UPDATE applications SET status=?, comments=? WHERE app_id=?', (req.status, req.comments, app_id))
+    
+    if req.status == 'approved':
+        # Create hospital
+        data = json.loads(row['data'])
+        h_id = f'HOSP-{uuid.uuid4().hex[:6].upper()}'
+        conn.execute('INSERT INTO hospitals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            (h_id, data['name'], data['license_number'], data['phone'], data['email'],
+             data['pincode'], data['address'], data['city'], data['state'],
+             data['admin_email'], data['password'], datetime.datetime.now().isoformat()))
+    
+    conn.commit(); conn.close()
+    return {'status': req.status}
+
+@app.get('/system/hospitals')
+def get_hospitals(auth = Depends(require_auth(['system_admin']))):
+    conn = get_db()
+    rows = conn.execute('SELECT hospital_id, name, city, email FROM hospitals').fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ── HOSPITAL ADMIN ────────────────────────────────────────────────
+@app.post('/hospital/staff/add')
+def add_staff(staff: dict, auth = Depends(require_auth(['hospital_admin']))):
+    staff_id = f'STAFF-{uuid.uuid4().hex[:6].upper()}'
+    conn = get_db()
+    conn.execute('INSERT INTO staff VALUES (?,?,?,?,?,?,?)',
+        (staff_id, auth['owner_id'], staff['name'], staff['username'], staff['password'], staff['role'], datetime.datetime.now().isoformat()))
+    conn.commit(); conn.close()
+    return {'staff_id': staff_id}
+
+@app.get('/hospital/staff')
+def list_staff(auth = Depends(require_auth(['hospital_admin']))):
+    conn = get_db()
+    rows = conn.execute('SELECT * FROM staff WHERE hospital_id=?', (auth['owner_id'],)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post('/hospital/staff/{staff_id}/deactivate')
+def deactivate_staff(staff_id: str, auth = Depends(require_auth(['hospital_admin']))):
+    conn = get_db()
+    conn.execute('DELETE FROM staff WHERE staff_id=? AND hospital_id=?', (staff_id, auth['owner_id']))
+    conn.commit(); conn.close()
+    return {'status': 'deactivated'}
 
 
 # ── HEALTH ────────────────────────────────────────────────────────

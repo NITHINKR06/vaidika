@@ -1,5 +1,5 @@
 // lib/api.js — VaidikaAI v4 — all API calls with auth
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const BASE = process.env.NEXT_PUBLIC_API_URL
 
 function getKey() {
     try {
@@ -20,27 +20,27 @@ async function req(path, opts = {}, apiKey = null) {
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────
-export const systemLogin    = d => req('/system/login', { method: 'POST', body: JSON.stringify(d) })
-export const hospitalApply  = d => req('/hospital/apply', { method: 'POST', body: JSON.stringify(d) })
-export const hospitalLogin  = d => req('/hospital/login', { method: 'POST', body: JSON.stringify(d) })
-export const staffLogin     = d => req('/staff/login', { method: 'POST', body: JSON.stringify(d) })
-export const logoutApi      = (key) => req('/logout', { method: 'POST' }, key)
+export const systemLogin = d => req('/system/login', { method: 'POST', body: JSON.stringify(d) })
+export const hospitalApply = d => req('/hospital/apply', { method: 'POST', body: JSON.stringify(d) })
+export const hospitalLogin = d => req('/hospital/login', { method: 'POST', body: JSON.stringify(d) })
+export const staffLogin = d => req('/staff/login', { method: 'POST', body: JSON.stringify(d) })
+export const logoutApi = (key) => req('/logout', { method: 'POST' }, key)
 
 // ── SYSTEM ADMIN ──────────────────────────────────────────────────
-export const getApplications   = (status = 'pending') => req(`/system/applications?status=${status}`)
+export const getApplications = (status = 'pending') => req(`/system/applications?status=${status}`)
 export const decideApplication = (id, d) => req(`/system/applications/${id}`, { method: 'POST', body: JSON.stringify(d) })
-export const getAllHospitals    = () => req('/system/hospitals')
+export const getAllHospitals = () => req('/system/hospitals')
 
 // ── HOSPITAL ADMIN ────────────────────────────────────────────────
-export const addStaff        = d  => req('/hospital/staff/add', { method: 'POST', body: JSON.stringify(d) })
-export const listStaff       = () => req('/hospital/staff')
+export const addStaff = d => req('/hospital/staff/add', { method: 'POST', body: JSON.stringify(d) })
+export const listStaff = () => req('/hospital/staff')
 export const deactivateStaff = id => req(`/hospital/staff/${id}/deactivate`, { method: 'POST' })
 
 // ── PATIENT ───────────────────────────────────────────────────────
-export const registerPatient = d  => req('/register', { method: 'POST', body: JSON.stringify(d) })
-export const getPatient      = id => req(`/patient/${id}`)
-export const getFullRecord   = id => req(`/record/${id}`)
-export const checkIn         = d  => req('/checkin', { method: 'POST', body: JSON.stringify(d) })
+export const registerPatient = d => req('/register', { method: 'POST', body: JSON.stringify(d) })
+export const getPatient = id => req(`/patient/${id}`)
+export const getFullRecord = id => req(`/record/${id}`)
+export const checkIn = d => req('/checkin', { method: 'POST', body: JSON.stringify(d) })
 export const getClinicalPDF_URL = id => `${BASE}/patient/${id}/pdf?api_key=${getKey()}`
 
 // ── CONSULTATION ──────────────────────────────────────────────────

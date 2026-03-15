@@ -79,6 +79,48 @@ def init_db():
             sms_sent   INTEGER DEFAULT 0,
             created_at TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS hospitals (
+            hospital_id   TEXT PRIMARY KEY,
+            name          TEXT NOT NULL,
+            license_number TEXT,
+            phone         TEXT,
+            email         TEXT UNIQUE,
+            pincode       TEXT,
+            address       TEXT,
+            city          TEXT,
+            state         TEXT,
+            admin_email   TEXT,
+            password      TEXT, -- Hashed in production, plain for hackathon
+            created_at    TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS staff (
+            staff_id    TEXT PRIMARY KEY,
+            hospital_id TEXT,
+            name        TEXT,
+            username    TEXT UNIQUE,
+            password    TEXT,
+            role        TEXT, -- doctor | receptionist | lab_tech | pharmacist
+            created_at  TEXT,
+            FOREIGN KEY(hospital_id) REFERENCES hospitals(hospital_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS applications (
+            app_id      TEXT PRIMARY KEY,
+            data        TEXT, -- JSON of HospitalApply
+            status      TEXT DEFAULT 'pending', -- pending | approved | rejected
+            comments    TEXT,
+            created_at  TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS api_keys (
+            key         TEXT PRIMARY KEY,
+            owner_id    TEXT, -- system | hospital_id | staff_id
+            role        TEXT, -- system_admin | hospital_admin | staff
+            created_at  TEXT,
+            expires_at  TEXT
+        );
     ''')
     conn.commit()
     conn.close()

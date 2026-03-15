@@ -60,3 +60,29 @@ class EmergencyAlertRequest(BaseModel):
     severity: str
     diagnosis: str
     room_number: int
+
+
+# ── AUTH & MANAGEMENT ─────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: str
+    hospital_id: Optional[str] = None
+
+class HospitalApply(BaseModel):
+    name: str
+    license_number: str
+    phone: str
+    email: str
+    pincode: str
+    address: str
+    city: str
+    state: str
+    admin_name: str
+    admin_email: str
+    password: str
+
+class ApplicationDecision(BaseModel):
+    status: str  # approved | rejected
+    comments: Optional[str] = None

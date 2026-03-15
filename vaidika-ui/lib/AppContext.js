@@ -1,60 +1,40 @@
 'use client'
 import { createContext, useContext, useState, useEffect } from 'react'
+import { logoutApi } from '@/lib/api'
 
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-    const [hospital, setHospital] = useState(null)
-    const [doctor, setDoctor] = useState(null)
-    const [selectedLanguage, setSelectedLanguage] = useState('hi-IN')
+    const [session, setSession] = useState(null)  // { api_key, role, hospital_id, name, hospital_name }
+    const [loading, setLoading] = useState(true)
 
-    // Auth States
-    const [hospitalLoggedIn, setHospitalLoggedIn] = useState(false)
-    const [doctorLoggedIn, setDoctorLoggedIn] = useState(false)
-
-    // Load from local storage on mount
     useEffect(() => {
-        const savedHospital = localStorage.getItem('vaidika_hospital')
-        const savedDoctor = localStorage.getItem('vaidika_doctor')
-
-        if (savedHospital) {
-            setHospital(JSON.parse(savedHospital))
-            setHospitalLoggedIn(true)
-        }
-        if (savedDoctor) {
-            setDoctor(JSON.parse(savedDoctor))
-            setDoctorLoggedIn(true)
-        }
+        try {
+            const saved = localStorage.getItem('vaidika_session')
+            if (saved) setSession(JSON.parse(saved))
+        } catch {}
+        setLoading(false)
     }, [])
 
-    const selectHospital = (h) => {
-        setHospital(h)
-        setHospitalLoggedIn(true)
-        localStorage.setItem('vaidika_hospital', JSON.stringify(h))
+    const login = (sessionData) => {
+        setSession(sessionData)
+        localStorage.setItem('vaidika_session', JSON.stringify(sessionData))
     }
 
-    const selectDoctor = (d) => {
-        setDoctor(d)
-        setDoctorLoggedIn(true)
-        localStorage.setItem('vaidika_doctor', JSON.stringify(d))
+    const logout = async () => {
+        if (session?.api_key) {
+            try { await logoutApi(session.api_key) } catch {}
+        }
+        setSession(null)
+        localStorage.removeItem('vaidika_session')
     }
 
-    const logout = () => {
-        setHospital(null)
-        setDoctor(null)
-        setHospitalLoggedIn(false)
-        setDoctorLoggedIn(false)
-        localStorage.removeItem('vaidika_hospital')
-        localStorage.removeItem('vaidika_doctor')
-    }
+    // Legacy compat — some pages use hospital/doctor directly
+    const hospital = session ? { id: session.hospital_id, name: session.hospital_name } : null
+    const doctor   = session?.role === 'doctor' ? { name: session.name } : null
 
     return (
-        <AppContext.Provider value={{
-            hospital, selectHospital, hospitalLoggedIn,
-            doctor, selectDoctor, doctorLoggedIn,
-            selectedLanguage, setSelectedLanguage,
-            logout
-        }}>
+        <AppContext.Provider value={{ session, login, logout, loading, hospital, doctor }}>
             {children}
         </AppContext.Provider>
     )

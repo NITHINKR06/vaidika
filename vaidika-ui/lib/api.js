@@ -1,5 +1,5 @@
 // lib/api.js — all API calls in one place
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://vaidika-backend.onrender.com'
 
 async function req(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, {

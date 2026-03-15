@@ -21,6 +21,7 @@ class PatientRegister(BaseModel):
     age: int
     gender: str
     language: str
+    hospital_id: Optional[str] = None
     aadhaar_last4: Optional[str] = None
 
 

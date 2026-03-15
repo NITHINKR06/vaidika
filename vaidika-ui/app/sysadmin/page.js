@@ -32,7 +32,7 @@ export default function SysAdminPage() {
         if (action === 'approve' && !confirm(`Approve ${name}?`)) return
         setLoading(true); setMsg('')
         try {
-            await decideApplication(id, { action, rejection_reason: reason })
+            await decideApplication(id, { status: action, comments: reason })
             setMsg(`Hospital ${action}d successfully`)
             fetchAll()
         } catch (e) { setMsg(e.message) }
@@ -59,7 +59,9 @@ export default function SysAdminPage() {
                     </div>
                 </div>
 
-                {msg && <div className="mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm">{msg}</div>}
+                {msg && <div key="msg-box" className="mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm">
+                    {typeof msg === 'string' ? msg : JSON.stringify(msg)}
+                </div>}
 
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-4 mb-8">
@@ -87,53 +89,54 @@ export default function SysAdminPage() {
                     ))}
                 </div>
 
-                {tab === 'pending' && (
-                    <div className="space-y-3">
-                        {applications.length === 0 && <p className="text-slate-500 text-sm py-8 text-center">No pending applications.</p>}
-                        {applications.map(a => (
-                            <div key={a.hospital_id} className="bg-slate-900/50 border border-white/5 rounded-2xl p-6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <Building2 className="w-5 h-5 text-slate-400" />
-                                            <span className="font-bold text-white text-lg">{a.name}</span>
-                                            <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded">{a.hospital_id}</span>
+                {tab === 'pending' ? (
+                    <div key="tab-pending" className="space-y-3">
+                        {applications.length === 0 ? (
+                            <p key="no-apps" className="text-slate-500 text-sm py-8 text-center">No pending applications.</p>
+                        ) : (
+                            applications.map((a, i) => (
+                                <div key={`app-${a.hospital_id}-${i}`} className="bg-slate-900/50 border border-white/5 rounded-2xl p-6">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <Building2 className="w-5 h-5 text-slate-400" />
+                                                <span className="font-bold text-white text-lg">{a.name}</span>
+                                                <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded">{a.hospital_id}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-400">
+                                                <span>{a.city}, {a.state}</span>
+                                                <span>{a.phone}</span>
+                                                <span>{a.admin_email}</span>
+                                                <span>License: {a.license_number}</span>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-2">Applied: {new Date(a.applied_at).toLocaleDateString()}</div>
                                         </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-400">
-                                            <span>{a.city}, {a.state}</span>
-                                            <span>{a.phone}</span>
-                                            <span>{a.admin_email}</span>
-                                            <span>License: {a.license_number}</span>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => decide(a.hospital_id, 'approved', a.name)} disabled={loading}
+                                                className="flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                                                <CheckCircle2 className="w-4 h-4" /> Approve
+                                            </button>
+                                            <button onClick={() => decide(a.hospital_id, 'rejected', a.name)} disabled={loading}
+                                                className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                                                <XCircle className="w-4 h-4" /> Reject
+                                            </button>
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-2">Applied: {new Date(a.applied_at).toLocaleDateString()}</div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => decide(a.hospital_id, 'approve', a.name)} disabled={loading}
-                                            className="flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all">
-                                            <CheckCircle2 className="w-4 h-4" /> Approve
-                                        </button>
-                                        <button onClick={() => decide(a.hospital_id, 'reject', a.name)} disabled={loading}
-                                            className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-xl text-sm font-semibold transition-all">
-                                            <XCircle className="w-4 h-4" /> Reject
-                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
-                )}
-
-                {tab === 'hospitals' && (
-                    <div className="space-y-2">
-                        {hospitals.map(h => (
-                            <div key={h.hospital_id} className="flex items-center justify-between bg-slate-900/50 border border-white/5 rounded-2xl px-5 py-4">
+                ) : (
+                    <div key="tab-hospitals" className="space-y-2">
+                        {hospitals.map((h, i) => (
+                            <div key={`hosp-${h.hospital_id}-${i}`} className="flex items-center justify-between bg-slate-900/50 border border-white/5 rounded-2xl px-5 py-4">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
                                         <Building2 className="w-5 h-5 text-slate-400" />
                                     </div>
                                     <div>
                                         <div className="font-semibold text-slate-200">{h.name}</div>
-                                        <div className="text-xs text-slate-500">{h.city}, {h.state} &nbsp;·&nbsp; {h.admin_email}</div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{h.city}, {h.state} &nbsp;·&nbsp; {h.admin_email}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4 text-xs">

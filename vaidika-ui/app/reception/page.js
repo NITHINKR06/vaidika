@@ -79,7 +79,7 @@ export default function ReceptionPage() {
     if (!form.name.trim() || !form.age) { setError('Name and age are required'); return }
     setLoading(true); setError('')
     try {
-      const data = await registerPatient({ ...form, age: parseInt(form.age) })
+      const data = await registerPatient({ ...form, age: parseInt(form.age), hospital_id: auth?.hospital_id })
       setResult(data)
     } catch (e) { setError(e.message) }
     setLoading(false)

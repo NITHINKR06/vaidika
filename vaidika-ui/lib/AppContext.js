@@ -12,7 +12,7 @@ export function AppProvider({ children }) {
         try {
             const saved = localStorage.getItem('vaidika_session')
             if (saved) setSession(JSON.parse(saved))
-        } catch {}
+        } catch { }
         setLoading(false)
     }, [])
 
@@ -23,7 +23,7 @@ export function AppProvider({ children }) {
 
     const logout = async () => {
         if (session?.api_key) {
-            try { await logoutApi(session.api_key) } catch {}
+            try { await logoutApi(session.api_key) } catch { }
         }
         setSession(null)
         localStorage.removeItem('vaidika_session')
@@ -31,10 +31,10 @@ export function AppProvider({ children }) {
 
     // Legacy compat — some pages use hospital/doctor directly
     const hospital = session ? { id: session.hospital_id, name: session.hospital_name } : null
-    const doctor   = session?.role === 'doctor' ? { name: session.name } : null
+    const doctor = session?.role === 'doctor' ? { name: session.name } : null
 
     return (
-        <AppContext.Provider value={{ session, login, logout, loading, hospital, doctor }}>
+        <AppContext.Provider value={{ session, auth: session, login, logout, loading, hospital, doctor }}>
             {children}
         </AppContext.Provider>
     )

@@ -25,6 +25,7 @@ def init_db():
             room_number   INTEGER DEFAULT 1,
             qr_code       TEXT,
             checked_in    INTEGER DEFAULT 0,
+            hospital_id   TEXT,
             created_at    TEXT
         );
 
@@ -123,4 +124,12 @@ def init_db():
         );
     ''')
     conn.commit()
+    
+    # Simple migration for existing DB
+    try:
+        conn.execute('ALTER TABLE patients ADD COLUMN hospital_id TEXT')
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # already exists
+        
     conn.close()

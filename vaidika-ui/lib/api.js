@@ -13,8 +13,10 @@ async function req(path, opts = {}, apiKey = null) {
     const headers = { 'Content-Type': 'application/json', ...(key ? { 'X-API-Key': key } : {}) }
     const res = await fetch(`${BASE}${path}`, { headers, ...opts })
     if (!res.ok) {
-        const e = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
-        throw new Error(e.detail || 'Request failed')
+        let e = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
+        let errMsg = e.detail || 'Request failed'
+        if (typeof errMsg !== 'string') errMsg = JSON.stringify(errMsg)
+        throw new Error(errMsg)
     }
     return res.json()
 }

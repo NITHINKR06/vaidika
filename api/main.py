@@ -133,8 +133,18 @@ def get_apps(status: str = 'pending', auth = Depends(require_auth(['system_admin
     conn.close()
     res = []
     for r in rows:
-        d = dict(r); d['data'] = json.loads(d['data'])
-        res.append(d)
+        d = dict(r)
+        app_data = json.loads(d.pop('data'))
+        # Flatten application data into the top level
+        # Rename app_id to hospital_id and created_at to applied_at for frontend compatibility
+        flat = {
+            **app_data,
+            'hospital_id': d['app_id'],
+            'status': d['status'],
+            'comments': d['comments'],
+            'applied_at': d['created_at']
+        }
+        res.append(flat)
     return res
 
 @app.post('/system/applications/{app_id}')
@@ -161,9 +171,20 @@ def decide_app(app_id: str, req: ApplicationDecision, auth = Depends(require_aut
 @app.get('/system/hospitals')
 def get_hospitals(auth = Depends(require_auth(['system_admin']))):
     conn = get_db()
-    rows = conn.execute('SELECT hospital_id, name, city, email FROM hospitals').fetchall()
+    rows = conn.execute('SELECT * FROM hospitals').fetchall()
+    res = []
+    for r in rows:
+        h = dict(r)
+        h['status'] = 'approved' # Since they are in hospitals table
+        # Get staff count for this hospital
+        sc = conn.execute('SELECT COUNT(*) FROM staff WHERE hospital_id=?', (h['hospital_id'],)).fetchone()[0]
+        h['staff_count'] = sc
+        # Patient count (now correctly linked)
+        pc = conn.execute('SELECT COUNT(*) FROM patients WHERE hospital_id=?', (h['hospital_id'],)).fetchone()[0]
+        h['patient_count'] = pc 
+        res.append(h)
     conn.close()
-    return [dict(r) for r in rows]
+    return res
 
 
 # ── HOSPITAL ADMIN ────────────────────────────────────────────────
@@ -220,10 +241,10 @@ def register_patient(req: PatientRegister):
         qr_code = generate_patient_qr(patient_id, req.name, token_number, room_number)
         conn.execute(
             '''UPDATE patients SET 
-               name=?, age=?, gender=?, language=?, aadhaar_last4=?, 
+               name=?, age=?, gender=?, language=?, hospital_id=?, aadhaar_last4=?, 
                token_number=?, room_number=?, qr_code=?, checked_in=0, created_at=? 
                WHERE patient_id=?''',
-            (req.name, req.age, req.gender, req.language, req.aadhaar_last4,
+            (req.name, req.age, req.gender, req.language, req.hospital_id, req.aadhaar_last4,
              token_number, room_number, qr_code, datetime.datetime.now().isoformat(), patient_id)
         )
     else:
@@ -231,10 +252,10 @@ def register_patient(req: PatientRegister):
         patient_id = f'VK-2025-{str(uuid.uuid4())[:5].upper()}'
         qr_code = generate_patient_qr(patient_id, req.name, token_number, room_number)
         conn.execute(
-            'INSERT INTO patients VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO patients VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
             (patient_id, req.name, req.age, req.gender, req.language,
              req.aadhaar_last4, token_number, room_number, qr_code, 0,
-             datetime.datetime.now().isoformat())
+             req.hospital_id, datetime.datetime.now().isoformat())
         )
     
     conn.commit()

@@ -41,7 +41,8 @@ def init_db():
             route_to        TEXT,
             followup        TEXT,
             clinical_notes  TEXT,
-            created_at      TEXT
+            created_at      TEXT,
+            hospital_id     TEXT
         );
 
         CREATE TABLE IF NOT EXISTS dept_updates (
@@ -128,6 +129,12 @@ def init_db():
     # Simple migration for existing DB
     try:
         conn.execute('ALTER TABLE patients ADD COLUMN hospital_id TEXT')
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # already exists
+        
+    try:
+        conn.execute('ALTER TABLE consultations ADD COLUMN hospital_id TEXT')
         conn.commit()
     except sqlite3.OperationalError:
         pass # already exists

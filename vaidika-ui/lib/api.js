@@ -52,8 +52,10 @@ export const saveConsultation = d => req('/consultation', { method: 'POST', body
 export const updateDepartment = (patientId, dept, action, data = {}) =>
     req('/department/update', { method: 'POST', body: JSON.stringify({ patient_id: patientId, dept, action, data }) })
 
-// ── TOKENS ────────────────────────────────────────────────────────
+// ── TOKENS & QUEUES ───────────────────────────────────────────────
 export const getActiveTokens = () => req('/tokens/active')
+export const getPharmacyQueue = () => req('/pharmacy/pending')
+export const getLabQueue = () => req('/lab/pending')
 
 // ── VOICE / LANGUAGE ──────────────────────────────────────────────
 export const translateText = (text, source_lang, target_lang) =>

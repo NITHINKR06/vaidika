@@ -106,10 +106,16 @@ def hospital_login(req: LoginRequest):
 @app.post('/staff/login')
 def staff_login(req: LoginRequest):
     conn = get_db()
-    s = conn.execute('SELECT * FROM staff WHERE username=? AND password=? AND hospital_id=?',
+    s = conn.execute('SELECT * FROM staff WHERE username=? AND password=? AND UPPER(hospital_id)=UPPER(?)',
         (req.username, req.password, req.hospital_id)).fetchone()
     if not s:
+        # Debug: check if user exists at all to provide better error info in logs
+        exist = conn.execute('SELECT 1 FROM staff WHERE username=? AND UPPER(hospital_id)=UPPER(?)', (req.username, req.hospital_id)).fetchone()
         conn.close()
+        if exist:
+            print(f"DEBUG: Staff login failed for {req.username} at {req.hospital_id} - Password mismatch")
+        else:
+            print(f"DEBUG: Staff login failed for {req.username} at {req.hospital_id} - Staff not found")
         raise HTTPException(401, 'Invalid staff credentials')
     key = f'sk_staff_{uuid.uuid4().hex[:8]}'
     conn.execute('INSERT INTO api_keys VALUES (?,?,?,?,?)',
@@ -408,7 +414,7 @@ def speak_b64(req: TTSRequest):
 
 # ── SAVE CONSULTATION ─────────────────────────────────────────────
 @app.post('/consultation')
-def save_consultation(req: ConsultationRequest):
+def save_consultation(req: ConsultationRequest, auth = Depends(require_auth(['doctor', 'hospital_admin']))):
     """
     1. Translate transcript to English (Sarvam)
     2. Qwen2.5 generates clinical record
@@ -433,12 +439,12 @@ def save_consultation(req: ConsultationRequest):
     now = datetime.datetime.now().isoformat()
 
     conn.execute(
-        'INSERT INTO consultations VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO consultations VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
         (consultation_id, req.patient_id, req.transcript,
          json.dumps(record.symptoms), record.diagnosis,
          json.dumps(record.prescriptions), json.dumps(record.lab_tests),
          record.severity, json.dumps(record.route_to),
-         record.followup, record.clinical_notes, now)
+         record.followup, record.clinical_notes, now, auth['hospital_id'])
     )
     if record.lab_tests:
         conn.execute('INSERT INTO lab_orders VALUES (?,?,?,?,?,?,?)',
@@ -507,38 +513,100 @@ def dept_update(req: DeptUpdateRequest):
     return {'status': 'updated', 'dept': req.dept}
 
 
+# ── PENDING QUEUES ────────────────────────────────────────────────
+@app.get('/pharmacy/pending')
+def get_pharmacy_pending(auth = Depends(require_auth(['pharmacist', 'hospital_admin', 'receptionist']))):
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT p.patient_id, p.name, p.token_number, rx.rx_id, rx.created_at
+        FROM prescriptions rx
+        JOIN patients p ON rx.patient_id = p.patient_id
+        WHERE rx.status = 'pending' AND p.hospital_id = ?
+        ORDER BY rx.created_at ASC
+    ''', (auth['owner_id'] if auth['role'] == 'hospital_admin' else auth['hospital_id'],)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.get('/lab/pending')
+def get_lab_pending(auth = Depends(require_auth(['lab_tech', 'hospital_admin', 'receptionist']))):
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT p.patient_id, p.name, p.token_number, lo.order_id, lo.created_at
+        FROM lab_orders lo
+        JOIN patients p ON lo.patient_id = p.patient_id
+        WHERE lo.status = 'pending' AND p.hospital_id = ?
+        ORDER BY lo.created_at ASC
+    ''', (auth['owner_id'] if auth['role'] == 'hospital_admin' else auth['hospital_id'],)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 # ── FULL RECORD ───────────────────────────────────────────────────
 @app.get('/record/{patient_id}')
 def get_full_record(patient_id: str):
     conn = get_db()
-    patient = conn.execute('SELECT * FROM patients WHERE patient_id=?', (patient_id,)).fetchone()
-    if not patient: raise HTTPException(404, 'Patient not found')
-    consult  = conn.execute('SELECT * FROM consultations WHERE patient_id=? ORDER BY created_at DESC LIMIT 1', (patient_id,)).fetchone()
-    lab      = conn.execute('SELECT * FROM lab_orders WHERE patient_id=? ORDER BY created_at DESC LIMIT 1', (patient_id,)).fetchone()
-    rx       = conn.execute('SELECT * FROM prescriptions WHERE patient_id=? ORDER BY created_at DESC LIMIT 1', (patient_id,)).fetchone()
-    updates  = conn.execute('SELECT * FROM dept_updates WHERE patient_id=? ORDER BY updated_at DESC', (patient_id,)).fetchall()
+    # Support case-insensitive patient_id search
+    row = conn.execute('SELECT * FROM patients WHERE UPPER(patient_id)=UPPER(?)', (patient_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, 'Patient not found')
+    
+    patient = dict(row)
+    p_id = patient['patient_id']
+
+    # Get FULL history
+    consults = conn.execute('''
+        SELECT c.*, h.name as hospital_name 
+        FROM consultations c 
+        LEFT JOIN hospitals h ON c.hospital_id = h.hospital_id
+        WHERE c.patient_id=? 
+        ORDER BY c.created_at DESC
+    ''', (p_id,)).fetchall()
+    
+    labs = conn.execute('SELECT * FROM lab_orders WHERE patient_id=? ORDER BY created_at DESC', (p_id,)).fetchall()
+    prescriptions = conn.execute('SELECT * FROM prescriptions WHERE patient_id=? ORDER BY created_at DESC', (p_id,)).fetchall()
+    updates = conn.execute('SELECT * FROM dept_updates WHERE patient_id=? ORDER BY updated_at DESC', (p_id,)).fetchall()
+    
     conn.close()
+    
     return {
-        'patient': dict(patient),
+        'patient': patient,
+        'history': [
+            {
+                'consultation_id': c['consultation_id'],
+                'hospital_name': c['hospital_name'] or 'Unknown Hospital',
+                'diagnosis': c['diagnosis'],
+                'severity': c['severity'],
+                'created_at': c['created_at'],
+                'symptoms': json.loads(c['symptoms']),
+                'prescriptions': json.loads(c['prescriptions']),
+                'lab_tests': json.loads(c['lab_tests']),
+                'followup': c['followup'],
+                'clinical_notes': c['clinical_notes']
+            } for c in consults
+        ],
+        'lab_history': [dict(l) for l in labs],
+        'prescription_history': [dict(pr) for pr in prescriptions],
+        # Latest record format for backward compatibility
         'consultation': {
-            'symptoms':      json.loads(consult['symptoms']) if consult else [],
-            'diagnosis':     consult['diagnosis'] if consult else '',
-            'prescriptions': json.loads(consult['prescriptions']) if consult else [],
-            'lab_tests':     json.loads(consult['lab_tests']) if consult else [],
-            'severity':      consult['severity'] if consult else '',
-            'route_to':      json.loads(consult['route_to']) if consult else [],
-            'followup':      consult['followup'] if consult else '',
-            'clinical_notes':consult['clinical_notes'] if consult else '',
-            'created_at':    consult['created_at'] if consult else None,
-        } if consult else {},
+            'symptoms':      json.loads(consults[0]['symptoms']) if consults else [],
+            'diagnosis':     consults[0]['diagnosis'] if consults else '',
+            'prescriptions': json.loads(consults[0]['prescriptions']) if consults else [],
+            'lab_tests':     json.loads(consults[0]['lab_tests']) if consults else [],
+            'severity':      consults[0]['severity'] if consults else '',
+            'route_to':      json.loads(consults[0]['route_to']) if consults else [],
+            'followup':      consults[0]['followup'] if consults else '',
+            'clinical_notes':consults[0]['clinical_notes'] if consults else '',
+            'created_at':    consults[0]['created_at'] if consults else None,
+        } if consults else {},
         'lab_status': {
-            'status': lab['status'] if lab else 'not_ordered',
-            'tests':  json.loads(lab['tests']) if lab else [],
-            'results':json.loads(lab['results']) if lab else {},
+            'status': labs[0]['status'] if labs else 'not_ordered',
+            'tests':  json.loads(labs[0]['tests']) if labs else [],
+            'results':json.loads(labs[0]['results']) if labs else {},
         },
         'pharmacy_status': {
-            'status':   rx['status'] if rx else 'not_prescribed',
-            'medicines':json.loads(rx['medicines']) if rx else [],
+            'status':   prescriptions[0]['status'] if prescriptions else 'not_prescribed',
+            'medicines':json.loads(prescriptions[0]['medicines']) if prescriptions else [],
         },
         'dept_updates': [{'dept':u['dept'],'action':u['action'],'data':json.loads(u['data']),'updated_at':u['updated_at']} for u in updates],
     }

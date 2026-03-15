@@ -24,7 +24,7 @@ export default function AuthPage() {
         e.preventDefault()
         setError(''); setLoading(true)
         try {
-            const res = await staffLogin(form.username, form.password, form.hospital_id)
+            const res = await staffLogin(form.username, form.password, form.hospital_id?.toUpperCase())
             if (res.api_key) {
                 login({ api_key: res.api_key, role: res.role, hospital_id: res.hospital_id, name: res.name })
                 redirectByRole(res.role, router)

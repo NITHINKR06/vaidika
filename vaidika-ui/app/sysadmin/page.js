@@ -20,8 +20,8 @@ export default function SysAdminPage() {
     }, [session])
 
     const fetchAll = () => {
-        getApplications('pending').then(setApplications).catch(() => {})
-        getAllHospitals().then(setHospitals).catch(() => {})
+        getApplications('pending').then(setApplications).catch(() => { })
+        getAllHospitals().then(setHospitals).catch(() => { })
     }
 
     const decide = async (id, action, name) => {

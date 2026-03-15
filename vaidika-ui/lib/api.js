@@ -20,10 +20,10 @@ async function req(path, opts = {}, apiKey = null) {
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────
-export const systemLogin = d => req('/system/login', { method: 'POST', body: JSON.stringify(d) })
+export const systemLogin = (username, password) => req('/system/login', { method: 'POST', body: JSON.stringify({ username, password }) })
 export const hospitalApply = d => req('/hospital/apply', { method: 'POST', body: JSON.stringify(d) })
-export const hospitalLogin = d => req('/hospital/login', { method: 'POST', body: JSON.stringify(d) })
-export const staffLogin = d => req('/staff/login', { method: 'POST', body: JSON.stringify(d) })
+export const hospitalLogin = (email, password) => req('/hospital/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+export const staffLogin = (username, password, hospital_id) => req('/staff/login', { method: 'POST', body: JSON.stringify({ username, password, hospital_id }) })
 export const logoutApi = (key) => req('/logout', { method: 'POST' }, key)
 
 // ── SYSTEM ADMIN ──────────────────────────────────────────────────

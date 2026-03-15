@@ -185,6 +185,7 @@ function redirectByRole(role, router) {
     else if (role === 'receptionist') router.push('/reception')
     else if (role === 'doctor') router.push('/doctor')
     else if (role === 'lab_tech') router.push('/lab')
+    else if (role === 'pharmacist') router.push('/pharmacy')
     else router.push('/')
 }
 

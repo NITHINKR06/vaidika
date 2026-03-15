@@ -31,9 +31,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!auth) { router.push('/auth'); return }
-    if (auth.role === 'doctor') { router.push('/doctor'); return }
-    if (auth.role === 'receptionist') { router.push('/reception'); return }
-    if (auth.role === 'lab_tech') { router.push('/lab'); return }
     if (auth.role === 'system_admin') { router.push('/sysadmin'); return }
     healthCheck().then(setStatus).catch(() => setStatus({ api: 'offline' }))
   }, [auth, router])
@@ -70,7 +67,13 @@ export default function Home() {
 
         {/* Portals Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {PORTALS.map((p, i) => (
+          {PORTALS.filter(p => {
+            if (auth.role === 'pharmacist') return p.href === '/pharmacy' || p.href === '/token-display';
+            if (auth.role === 'lab_tech') return p.href === '/lab' || p.href === '/token-display';
+            if (auth.role === 'receptionist') return p.href === '/reception' || p.href === '/token-display';
+            if (auth.role === 'doctor') return p.href === '/doctor' || p.href === '/token-display';
+            return true;
+          }).map((p, i) => (
             <Link key={p.href} href={p.href}
               className="group relative bg-[#081225]/60 hover:bg-[#0c1a35]/80 border border-white/5 hover:border-cyan-500/40 rounded-[2rem] p-8 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(6,182,212,0.15)] flex flex-col h-[280px]"
             >

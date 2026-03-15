@@ -13,6 +13,8 @@
 - 🔉 **Bilingual Kiosk & Discharge** — System speaks to patients in their preferred language during check-in and discharge.
 - 🚨 **Emergency SMS alerts** — Twilio sends SMS to duty team for high/emergency cases automatically.
 - 📊 **Analytics dashboard** — live stats, severity breakdown, language chart, dept completion rates.
+- 🤖 **Multi-LLM Intelligence** — Support for Google Gemini (Primary), Llama 3.2 (Local), and Claude 3.5.
+- 🔄 **Returning Patients** — One-click re-registration via patient ID or QR scan.
 
 ---
 
@@ -33,11 +35,13 @@ graph TD
 
     subgraph "External Services"
         Sarvam["Sarvam AI (STT, Translate, TTS)"]
+        Gemini["Google Gemini (Primary LLM)"]
+        Claude["Claude 3.5 (Fallback)"]
         Twilio["Twilio SMS API"]
     end
 
     subgraph "Local AI & Data"
-        Ollama["Ollama (Qwen 2.5:7b)"]
+        Ollama["Ollama (Llama 3.2:3b)"]
         SQLite["SQLite DB (Main Storage)"]
         Delta["Delta Lake (Analytics)"]
         Airflow["Airflow (Pipelines)"]
@@ -46,6 +50,8 @@ graph TD
     UI <--> API
     BrowserMic --> API
     API <--> Sarvam
+    API <--> Gemini
+    API <--> Claude
     API <--> Ollama
     API <--> SQLite
     API --> Twilio
@@ -135,10 +141,10 @@ pip install -r requirements.txt
 # Linux/Mac
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve &
-ollama pull qwen2.5:7b
+ollama pull llama3.2:3b
 
 # Verify
-ollama list   # should show qwen2.5:7b
+ollama list   # should show llama3.2:3b
 ```
 
 ### Step 4 — Test AI agent alone
@@ -298,8 +304,9 @@ erDiagram
 
 | Component | Technology |
 |-----------|-----------|
-| Local AI | Qwen2.5:7b via Ollama (100% offline) |
-| Voice | Sarvam AI (saarika, mayura, bulbul models) |
+| Local AI | Llama 3.2:3b via Ollama (100% offline) |
+| Cloud AI | Google Gemini Flash 1.5 & Claude 3.5 |
+| Voice | Sarvam AI (saarika:v2.5, mayura-v1, bulbul-v2) |
 | QR | `qrcode` (Python) + `html5-qrcode` (JS) |
 | PDF | `fpdf2` (Python) |
 | Backend | FastAPI + SQLite |

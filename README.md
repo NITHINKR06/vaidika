@@ -163,8 +163,8 @@ python api/main.py
 ### Step 6 — Start frontend
 ```bash
 cd vaidika-ui
-npm install
-npm run dev
+npm install or yarn install
+npm run dev or yarn dev
 # Frontend: http://localhost:3000
 ```
 
